@@ -8,6 +8,7 @@ import ScoreInput from './pages/ScoreInput';
 import StudentsList from './pages/StudentsList';
 import StudentProfile from './pages/StudentProfile';
 import Reports from './pages/Reports';
+import StudentProgress from './pages/StudentProgress';
 import AdminSubjects from './pages/admin/AdminSubjects';
 import AdminLevels from './pages/admin/AdminLevels';
 import AdminClasses from './pages/admin/AdminClasses';
@@ -64,6 +65,7 @@ function ProtectedRoutes() {
         <Route path="/students" element={<StudentsList />} />
         <Route path="/students/:id" element={<StudentProfile />} />
         <Route path="/reports" element={<Reports />} />
+        <Route path="/progress" element={<StudentProgress />} />
 
         {/* Admin-only */}
         <Route path="/admin/results" element={<AdminRoute><AdminResults /></AdminRoute>} />

@@ -78,3 +78,39 @@ export type Score = {
   created_at: string;
   subject?: Subject;
 };
+
+export type Strand = {
+  id: string;
+  name: string;
+  subject_id: string;
+  school_id: string;
+  sort_order: number;
+  created_at: string;
+  subject?: Subject;
+};
+
+export type SubStrand = {
+  id: string;
+  name: string;
+  strand_id: string;
+  school_id: string;
+  sort_order: number;
+  created_at: string;
+  strand?: Strand;
+};
+
+export type CompetencyAssessment = {
+  id: string;
+  student_id: string;
+  sub_strand_id: string;
+  score: number;
+  cbc_level: 'EE' | 'ME' | 'AE' | 'BE';
+  term: string;
+  teacher_id: string;
+  school_id: string;
+  ai_comment: string;
+  teacher_note: string;
+  created_at: string;
+  updated_at: string;
+  sub_strand?: SubStrand;
+};
