@@ -2,12 +2,13 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import type { Profile } from '../lib/supabase';
+import type { Profile, School } from '../lib/supabase';
 
 type AuthContextType = {
   user: User | null;
   session: Session | null;
   profile: Profile | null;
+  school: School | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (email: string, password: string, name: string, schoolId: string, role: 'teacher' | 'admin') => Promise<{ error: string | null }>;
@@ -20,11 +21,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [school, setSchool] = useState<School | null>(null);
   const [loading, setLoading] = useState(true);
 
   async function loadProfile(userId: string) {
-    const { data } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
-    setProfile(data);
+    const { data } = await supabase
+      .from('profiles')
+      .select('*, school:schools(*)')
+      .eq('id', userId)
+      .maybeSingle();
+    if (data) {
+      const { school: schoolData, ...profileData } = data as Profile & { school: School | null };
+      setProfile(profileData);
+      setSchool(schoolData);
+    } else {
+      setProfile(null);
+      setSchool(null);
+    }
   }
 
   useEffect(() => {
@@ -86,10 +99,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setSession(null);
     setProfile(null);
+    setSchool(null);
   }
 
   return (
-    <AuthContext.Provider value={{ user, session, profile, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, session, profile, school, loading, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );

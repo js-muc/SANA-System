@@ -93,7 +93,7 @@ function NavSectionLabel({ label, icon: Icon }: { label: string; icon?: React.El
 }
 
 function SidebarContent({ onClose }: { onClose?: () => void }) {
-  const { profile, signOut } = useAuth();
+  const { profile, school, signOut } = useAuth();
   const navigate = useNavigate();
   const isAdmin = profile?.role === 'admin';
   const isSuperAdmin = profile?.role === 'super_admin';
@@ -110,10 +110,10 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
         <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center shrink-0">
           <Brain className="w-5 h-5 text-white" />
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="font-bold text-slate-900 leading-none text-sm">SANA OS</p>
-          <p className="text-[10px] text-slate-400 mt-0.5 leading-none">
-            {isSuperAdmin ? 'System Owner' : 'Intelligence System'}
+          <p className="text-[10px] text-slate-400 mt-0.5 leading-none truncate">
+            {isSuperAdmin ? 'System Owner' : (school?.name ?? 'Intelligence System')}
           </p>
         </div>
       </div>
@@ -171,10 +171,16 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
             <p className="text-sm font-medium text-slate-900 truncate leading-none">{profile?.name ?? 'User'}</p>
             <div className="flex items-center gap-1 mt-0.5">
               {(isAdmin || isSuperAdmin) && <Shield className="w-2.5 h-2.5 text-blue-500" />}
-              <p className="text-[11px] text-slate-400 capitalize">
+              <p className="text-[11px] text-slate-400 capitalize truncate">
                 {profile?.role === 'super_admin' ? 'Super Admin' : profile?.role ?? 'teacher'}
               </p>
             </div>
+            {school && !isSuperAdmin && (
+              <div className="flex items-center gap-1 mt-1">
+                <Building2 className="w-2.5 h-2.5 text-slate-300 shrink-0" />
+                <p className="text-[10px] text-slate-400 truncate leading-none">{school.name}</p>
+              </div>
+            )}
           </div>
         </div>
         <button
