@@ -29,13 +29,15 @@ import type { Student, Score, Profile } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { analyzeStudent, getRiskColor } from '../lib/riskEngine';
 import type { StudentRisk } from '../lib/riskEngine';
+import { Building2 } from 'lucide-react';
 
 type StudentWithRisk = Student & { risk: StudentRisk };
 
 export default function Dashboard() {
-  const { user, profile } = useAuth();
+  const { user, profile, school } = useAuth();
   const navigate = useNavigate();
   const isAdmin = profile?.role === 'admin';
+  const schoolId = profile?.school_id;
 
   const [students, setStudents] = useState<Student[]>([]);
   const [scores, setScores] = useState<Score[]>([]);
@@ -49,7 +51,10 @@ export default function Dashboard() {
       const studentsQ = supabase.from('students').select('*, class:classes(*, level:levels(*))');
       const scoresQ = supabase.from('scores').select('*, subject:subjects(*)');
 
-      if (!isAdmin) {
+      if (isAdmin) {
+        studentsQ.eq('school_id', schoolId!);
+        scoresQ.eq('school_id', schoolId!);
+      } else {
         studentsQ.eq('teacher_id', user!.id);
         scoresQ.eq('teacher_id', user!.id);
       }
@@ -57,8 +62,8 @@ export default function Dashboard() {
       const ops: Promise<any>[] = [studentsQ, scoresQ];
       if (isAdmin) {
         ops.push(
-          supabase.from('profiles').select('*').eq('role', 'teacher'),
-          supabase.from('classes').select('id', { count: 'exact', head: true })
+          supabase.from('profiles').select('*').eq('role', 'teacher').eq('school_id', schoolId!),
+          supabase.from('classes').select('id', { count: 'exact', head: true }).eq('school_id', schoolId!)
         );
       }
 
@@ -150,6 +155,12 @@ export default function Dashboard() {
       <div className="flex items-start justify-between mb-8">
         <div>
           <div className="flex items-center gap-2 mb-1">
+            {school && (
+              <span className="flex items-center gap-1.5 text-xs font-semibold bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full">
+                <Building2 className="w-3 h-3" />
+                {school.name}
+              </span>
+            )}
             {isAdmin && (
               <span className="text-xs font-semibold bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full uppercase tracking-wide">
                 School Overview

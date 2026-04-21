@@ -3,6 +3,7 @@ import { BarChart2, Filter, Search, X, TrendingUp, FileText } from 'lucide-react
 import { supabase } from '../../lib/supabase';
 import type { Score, Profile, Class, Subject } from '../../lib/supabase';
 import { getCBCColor, getCBCLevel } from '../../lib/riskEngine';
+import { useAuth } from '../../contexts/AuthContext';
 
 const TERMS = ['all', 'Term 1', 'Term 2', 'Term 3'];
 
@@ -12,6 +13,9 @@ type EnrichedScore = Score & {
 };
 
 export default function AdminResults() {
+  const { profile } = useAuth();
+  const schoolId = profile?.school_id;
+
   const [scores, setScores] = useState<EnrichedScore[]>([]);
   const [teachers, setTeachers] = useState<Profile[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
@@ -26,17 +30,18 @@ export default function AdminResults() {
 
   useEffect(() => {
     load();
-  }, []);
+  }, [schoolId]);
 
   async function load() {
     const [scoresRes, teachersRes, classesRes, subjectsRes] = await Promise.all([
       supabase
         .from('scores')
         .select('*, subject:subjects(*), student:students(id, name, class_id)')
+        .eq('school_id', schoolId!)
         .order('created_at', { ascending: false }),
-      supabase.from('profiles').select('*').eq('role', 'teacher').order('name'),
-      supabase.from('classes').select('*, level:levels(*)').order('name'),
-      supabase.from('subjects').select('*').order('name'),
+      supabase.from('profiles').select('*').eq('role', 'teacher').eq('school_id', schoolId!).order('name'),
+      supabase.from('classes').select('*, level:levels(*)').eq('school_id', schoolId!).order('name'),
+      supabase.from('subjects').select('*').eq('school_id', schoolId!).order('name'),
     ]);
 
     // Attach teacher profile to each score

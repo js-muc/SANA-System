@@ -4,6 +4,7 @@ import { UserCog, Users, BarChart2, ArrowRight, Search } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import type { Profile, Student, Score } from '../../lib/supabase';
 import { getCBCLevel, getCBCColor } from '../../lib/riskEngine';
+import { useAuth } from '../../contexts/AuthContext';
 
 type TeacherStats = Profile & {
   studentCount: number;
@@ -14,6 +15,9 @@ type TeacherStats = Profile & {
 
 export default function AdminTeachers() {
   const navigate = useNavigate();
+  const { profile } = useAuth();
+  const schoolId = profile?.school_id;
+
   const [teachers, setTeachers] = useState<Profile[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [scores, setScores] = useState<Score[]>([]);
@@ -23,9 +27,9 @@ export default function AdminTeachers() {
   useEffect(() => {
     async function load() {
       const [teachersRes, studentsRes, scoresRes] = await Promise.all([
-        supabase.from('profiles').select('*').eq('role', 'teacher').order('name'),
-        supabase.from('students').select('id, name, teacher_id, class_id, class:classes(name)'),
-        supabase.from('scores').select('id, score, teacher_id, term, created_at'),
+        supabase.from('profiles').select('*').eq('role', 'teacher').eq('school_id', schoolId!).order('name'),
+        supabase.from('students').select('id, name, teacher_id, class_id, class:classes(name)').eq('school_id', schoolId!),
+        supabase.from('scores').select('id, score, teacher_id, term, created_at').eq('school_id', schoolId!),
       ]);
       setTeachers(teachersRes.data ?? []);
       setStudents(studentsRes.data ?? []);
@@ -33,7 +37,7 @@ export default function AdminTeachers() {
       setLoading(false);
     }
     load();
-  }, []);
+  }, [schoolId]);
 
   const teacherStats = useMemo<TeacherStats[]>(() => {
     return teachers.map(t => {

@@ -27,6 +27,7 @@ export type Level = {
   name: string;
   sort_order: number;
   school_id: string;
+  pathway: string | null;
   created_at: string;
 };
 

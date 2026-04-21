@@ -73,15 +73,16 @@ export default function ScoreInput() {
   const [editingName, setEditingName] = useState('');
   const editInputRef = useRef<HTMLInputElement>(null);
 
-  // ── Load all admin-created classes once ───────────────────────────────────
+  // ── Load all admin-created classes once (scoped to this school) ──────────
   useEffect(() => {
-    if (!user) return;
+    if (!user || !schoolId) return;
     supabase
       .from('classes')
       .select('*, level:levels(*)')
+      .eq('school_id', schoolId)
       .order('name')
       .then(({ data }) => setClasses(data ?? []));
-  }, [user]);
+  }, [user, schoolId]);
 
   // ── Load students + subjects when class changes ───────────────────────────
   useEffect(() => {
@@ -121,7 +122,6 @@ export default function ScoreInput() {
             .from('level_subjects')
             .select('subject:subjects(*)')
             .eq('level_id', levelId)
-            .order('subject(name)')
         : Promise.resolve({ data: [] }),
     ]);
 

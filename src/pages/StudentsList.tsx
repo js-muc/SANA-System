@@ -17,6 +17,7 @@ export default function StudentsList() {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
   const isAdmin = profile?.role === 'admin';
+  const schoolId = profile?.school_id;
 
   const [students, setStudents] = useState<Student[]>([]);
   const [scores, setScores] = useState<Score[]>([]);
@@ -38,7 +39,10 @@ export default function StudentsList() {
         .order('name');
       const scoresQ = supabase.from('scores').select('*, subject:subjects(*)');
 
-      if (!isAdmin) {
+      if (isAdmin) {
+        studentsQ.eq('school_id', schoolId!);
+        scoresQ.eq('school_id', schoolId!);
+      } else {
         studentsQ.eq('teacher_id', user!.id);
         scoresQ.eq('teacher_id', user!.id);
       }
@@ -46,8 +50,8 @@ export default function StudentsList() {
       const ops: Promise<any>[] = [studentsQ, scoresQ];
       if (isAdmin) {
         ops.push(
-          supabase.from('profiles').select('*').eq('role', 'teacher').order('name'),
-          supabase.from('classes').select('*, level:levels(*)').order('name')
+          supabase.from('profiles').select('*').eq('role', 'teacher').eq('school_id', schoolId!).order('name'),
+          supabase.from('classes').select('*, level:levels(*)').eq('school_id', schoolId!).order('name')
         );
       }
 

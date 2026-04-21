@@ -27,10 +27,11 @@ function AdminClasses() {
   }, []);
 
   async function load() {
+    const schoolId = profile!.school_id;
     const [classesRes, levelsRes, teachersRes] = await Promise.all([
-      supabase.from('classes').select('*, level:levels(*)').order('name'),
-      supabase.from('levels').select('*').order('sort_order'),
-      supabase.from('profiles').select('*').eq('role', 'teacher').order('name'),
+      supabase.from('classes').select('*, level:levels(*)').eq('school_id', schoolId!).order('name'),
+      supabase.from('levels').select('*').eq('school_id', schoolId!).order('sort_order'),
+      supabase.from('profiles').select('*').eq('role', 'teacher').eq('school_id', schoolId!).order('name'),
     ]);
     setClasses(classesRes.data ?? []);
     const levelList = levelsRes.data ?? [];
