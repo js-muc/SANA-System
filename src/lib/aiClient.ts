@@ -1,10 +1,10 @@
-// aiClient.ts — thin wrapper around the ai-insights Supabase Edge Function
-// All AI calls go through this module so the API key never touches the browser.
+// aiClient.ts — browser-side wrapper around the ai-insights Supabase Edge Function
+// API key never touches the browser; all AI calls are proxied through the edge function.
 
 const FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-insights`;
 const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// ── Payload types (must match edge function) ─────────────────────────────────
+// ── Payload types (must mirror edge function input) ───────────────────────────
 
 export interface CommentPayload {
   studentName: string;
@@ -15,6 +15,8 @@ export interface CommentPayload {
   cbcLevel: 'EE' | 'ME' | 'AE' | 'BE';
   term: string;
   priorAssessments?: Array<{ term: string; score: number; cbcLevel: string }>;
+  /** When true, returns a plain-language summary safe to share with parents */
+  forParent?: boolean;
 }
 
 export interface TrendPayload {
@@ -24,9 +26,12 @@ export interface TrendPayload {
   assessments: Array<{ term: string; score: number; cbcLevel: string }>;
 }
 
-// ── Core fetch helper ────────────────────────────────────────────────────────
+// ── Core fetch ────────────────────────────────────────────────────────────────
 
-async function callAI(type: 'comment' | 'trend', payload: CommentPayload | TrendPayload): Promise<string> {
+async function callAI(
+  type: 'comment' | 'trend',
+  payload: CommentPayload | TrendPayload,
+): Promise<string> {
   const res = await fetch(FUNCTION_URL, {
     method: 'POST',
     headers: {
@@ -46,14 +51,20 @@ async function callAI(type: 'comment' | 'trend', payload: CommentPayload | Trend
   return data.result as string;
 }
 
-// ── Public API ───────────────────────────────────────────────────────────────
+// ── Public API ────────────────────────────────────────────────────────────────
 
-/** Generate teacher comment + recommendation + activity for a single assessment */
+/**
+ * Generate a CBC-aligned teacher comment (or parent-friendly summary).
+ * Includes: performance observation, teaching recommendation, activity suggestion.
+ */
 export function generateComment(payload: CommentPayload): Promise<string> {
   return callAI('comment', payload);
 }
 
-/** Generate a trend prediction statement for a student's sub-strand history */
+/**
+ * Generate a trend-based prediction for a student's sub-strand performance history.
+ * Warns if declining, encourages if improving.
+ */
 export function generateTrendInsight(payload: TrendPayload): Promise<string> {
   return callAI('trend', payload);
 }

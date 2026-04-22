@@ -1,144 +1,139 @@
-// AdminSubjects.tsx
-// Manage school subjects + their strands and sub-strands.
-// Admin can: create/edit/delete subjects, create/edit/delete strands per subject,
-//            create/edit/delete sub-strands per strand.
+// AdminSubjects.tsx — Admin curriculum management
+// Three-level hierarchy: Learning Areas (Subjects) → Strands → Sub-strands
+// Admin creates the structure here; teachers fill in student progress.
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
-  Plus, Trash2, BookOpen, AlertCircle, CheckCircle, Search,
-  ChevronDown, ChevronRight, Pencil, X, Layers, Atom, Save,
+  Plus, Trash2, Pencil, Check, X, Search, BookOpen,
+  Layers, Atom, ChevronRight, ChevronDown, AlertCircle,
+  CheckCircle2, GripVertical, FolderOpen, Folder,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import type { Subject, Strand, SubStrand } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 
-// ── Inline editable name row ──────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
 
-function EditableRow({
-  name, onSave, onDelete, indent = 0,
-  addChildLabel, onAddChild, children, defaultOpen = false,
+type Flash = { type: 'success' | 'error'; msg: string };
+
+// ── Inline name editor ────────────────────────────────────────────────────────
+
+function InlineEdit({
+  value,
+  onCommit,
+  onCancel,
+  size = 'md',
 }: {
-  name: string;
-  onSave: (newName: string) => Promise<void>;
-  onDelete: () => Promise<void>;
-  indent?: number;
-  addChildLabel?: string;
-  onAddChild?: () => void;
-  children?: React.ReactNode;
-  defaultOpen?: boolean;
+  value: string;
+  onCommit: (v: string) => Promise<void>;
+  onCancel: () => void;
+  size?: 'sm' | 'md';
 }) {
-  const [editing, setEditing] = useState(false);
-  const [editVal, setEditVal] = useState(name);
+  const [val, setVal] = useState(value);
   const [saving, setSaving] = useState(false);
-  const [open, setOpen] = useState(defaultOpen);
+  const ref = useRef<HTMLInputElement>(null);
 
-  async function commitEdit() {
-    const trimmed = editVal.trim();
-    if (!trimmed || trimmed === name) { setEditing(false); setEditVal(name); return; }
+  useEffect(() => { ref.current?.focus(); ref.current?.select(); }, []);
+
+  async function commit() {
+    const t = val.trim();
+    if (!t || t === value) { onCancel(); return; }
     setSaving(true);
-    await onSave(trimmed);
+    await onCommit(t);
     setSaving(false);
-    setEditing(false);
   }
 
   return (
-    <div>
-      <div
-        className={`flex items-center gap-2 py-2.5 px-3 rounded-xl group hover:bg-slate-50 transition ${
-          indent === 1 ? 'ml-4' : indent === 2 ? 'ml-8' : ''
+    <div className="flex items-center gap-1.5 flex-1 min-w-0">
+      <input
+        ref={ref}
+        value={val}
+        onChange={e => setVal(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === 'Enter') commit();
+          if (e.key === 'Escape') onCancel();
+        }}
+        className={`flex-1 border-2 border-blue-400 rounded-lg bg-white focus:outline-none focus:border-blue-500 ${
+          size === 'sm' ? 'px-2 py-1 text-xs' : 'px-3 py-1.5 text-sm'
         }`}
+      />
+      <button
+        onClick={commit}
+        disabled={saving}
+        className="w-6 h-6 flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition shrink-0"
       >
-        {children && (
-          <button onClick={() => setOpen(o => !o)} className="p-0.5 text-slate-400 hover:text-slate-600 transition shrink-0">
-            {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-          </button>
-        )}
-        {!children && <div className="w-4 shrink-0" />}
-
-        {editing ? (
-          <input
-            autoFocus
-            value={editVal}
-            onChange={e => setEditVal(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') { setEditing(false); setEditVal(name); } }}
-            className="flex-1 border border-blue-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-          />
-        ) : (
-          <span className={`flex-1 text-sm font-medium text-slate-900 truncate ${indent > 0 ? 'text-slate-700' : ''}`}>{name}</span>
-        )}
-
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition shrink-0">
-          {editing ? (
-            <>
-              <button onClick={commitEdit} disabled={saving} className="p-1 text-blue-600 hover:bg-blue-50 rounded-lg transition disabled:opacity-50">
-                {saving ? <div className="w-3.5 h-3.5 border border-blue-500 border-t-transparent rounded-full animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-              </button>
-              <button onClick={() => { setEditing(false); setEditVal(name); }} className="p-1 text-slate-400 hover:bg-slate-100 rounded-lg transition">
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </>
-          ) : (
-            <>
-              {addChildLabel && onAddChild && (
-                <button onClick={onAddChild} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition" title={`Add ${addChildLabel}`}>
-                  <Plus className="w-3.5 h-3.5" />
-                </button>
-              )}
-              <button onClick={() => { setEditing(true); setEditVal(name); }} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition">
-                <Pencil className="w-3.5 h-3.5" />
-              </button>
-              <button onClick={onDelete} className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition">
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-      {children && open && <div>{children}</div>}
+        {saving
+          ? <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" />
+          : <Check className="w-3 h-3" />}
+      </button>
+      <button
+        onClick={onCancel}
+        className="w-6 h-6 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-lg transition shrink-0"
+      >
+        <X className="w-3 h-3" />
+      </button>
     </div>
   );
 }
 
-// ── Inline add form ───────────────────────────────────────────────────────────
+// ── Quick-add input ───────────────────────────────────────────────────────────
 
-function AddForm({
-  placeholder, onAdd, indent = 0,
+function QuickAdd({
+  placeholder,
+  onAdd,
+  autoFocus = false,
 }: {
   placeholder: string;
   onAdd: (name: string) => Promise<void>;
-  indent?: number;
+  autoFocus?: boolean;
 }) {
   const [val, setVal] = useState('');
   const [adding, setAdding] = useState(false);
+  const ref = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { if (autoFocus) ref.current?.focus(); }, [autoFocus]);
 
   async function submit() {
-    const trimmed = val.trim();
-    if (!trimmed) return;
+    const t = val.trim();
+    if (!t) return;
     setAdding(true);
-    await onAdd(trimmed);
+    await onAdd(t);
     setVal('');
     setAdding(false);
+    ref.current?.focus();
   }
 
   return (
-    <div className={`flex items-center gap-2 py-2 px-3 ${indent === 1 ? 'ml-4' : indent === 2 ? 'ml-8' : ''}`}>
-      <div className="w-4 shrink-0" />
+    <div className="flex items-center gap-2">
       <input
+        ref={ref}
         value={val}
         onChange={e => setVal(e.target.value)}
         onKeyDown={e => e.key === 'Enter' && submit()}
         placeholder={placeholder}
-        className="flex-1 border border-slate-200 rounded-xl px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50"
+        className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
       />
       <button
         onClick={submit}
         disabled={adding || !val.trim()}
-        className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-semibold px-3 py-1.5 rounded-xl transition"
+        className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-xs font-semibold px-4 py-2 rounded-xl transition shadow-sm shrink-0"
       >
-        {adding ? <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" /> : <Plus className="w-3 h-3" />}
+        {adding
+          ? <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" />
+          : <Plus className="w-3 h-3" />}
         Add
       </button>
     </div>
+  );
+}
+
+// ── CBC level badge ────────────────────────────────────────────────────────────
+
+function CountPill({ n, label }: { n: number; label: string }) {
+  return (
+    <span className="text-[10px] font-medium text-slate-400 whitespace-nowrap">
+      {n} {label}{n !== 1 ? 's' : ''}
+    </span>
   );
 }
 
@@ -152,413 +147,529 @@ export default function AdminSubjects() {
   const [strands, setStrands] = useState<Strand[]>([]);
   const [subStrands, setSubStrands] = useState<SubStrand[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const [newSubjectName, setNewSubjectName] = useState('');
-  const [addingSubject, setAddingSubject] = useState(false);
   const [search, setSearch] = useState('');
+  const [flash, setFlash] = useState<Flash | null>(null);
 
-  // Which subjects have their strand list expanded
-  const [expandedSubjects, setExpandedSubjects] = useState<Set<string>>(new Set());
-  // Which strands have their sub-strand add form visible
-  const [addSubStrandFor, setAddSubStrandFor] = useState<string | null>(null);
-  // Which subjects have their add-strand form visible
-  const [addStrandFor, setAddStrandFor] = useState<string | null>(null);
+  // Track which subject panels are open
+  const [openSubjects, setOpenSubjects] = useState<Set<string>>(new Set());
+  // Track which strand sub-strand lists are open
+  const [openStrands, setOpenStrands] = useState<Set<string>>(new Set());
 
-  const [flash, setFlash] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
+  // Inline editing state: key = id, value = true
+  const [editingSubject, setEditingSubject] = useState<string | null>(null);
+  const [editingStrand, setEditingStrand] = useState<string | null>(null);
+  const [editingSubStrand, setEditingSubStrand] = useState<string | null>(null);
 
-  // ── Load ──────────────────────────────────────────────────────────────────
+  // Show add-strand form inside subject
+  const [addStrandInSubject, setAddStrandInSubject] = useState<string | null>(null);
+  // Show add-sub-strand form inside strand
+  const [addSubStrandInStrand, setAddSubStrandInStrand] = useState<string | null>(null);
+
+  // ── Load ────────────────────────────────────────────────────────────────────
   const load = useCallback(async () => {
-    const [subjectsRes, strandsRes, subStrandsRes] = await Promise.all([
+    const [s, st, ss] = await Promise.all([
       supabase.from('subjects').select('*').eq('school_id', schoolId).order('name'),
       supabase.from('strands').select('*').eq('school_id', schoolId).order('sort_order'),
       supabase.from('sub_strands').select('*').eq('school_id', schoolId).order('sort_order'),
     ]);
-    setSubjects(subjectsRes.data ?? []);
-    setStrands(strandsRes.data ?? []);
-    setSubStrands(subStrandsRes.data ?? []);
+    setSubjects(s.data ?? []);
+    setStrands(st.data ?? []);
+    setSubStrands(ss.data ?? []);
     setLoading(false);
   }, [schoolId]);
 
   useEffect(() => { load(); }, [load]);
 
-  function showFlash(type: 'success' | 'error', msg: string) {
+  function toast(type: Flash['type'], msg: string) {
     setFlash({ type, msg });
-    setTimeout(() => setFlash(null), 3000);
+    setTimeout(() => setFlash(null), 3500);
   }
 
-  // ── Subject CRUD ──────────────────────────────────────────────────────────
+  function toggleSubject(id: string) {
+    setOpenSubjects(prev => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  }
 
-  async function addSubject() {
-    const trimmed = newSubjectName.trim();
-    if (!trimmed) return;
-    setAddingSubject(true);
+  function toggleStrand(id: string) {
+    setOpenStrands(prev => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  }
+
+  // ── Subject CRUD ────────────────────────────────────────────────────────────
+
+  async function addSubject(name: string) {
     const { data, error } = await supabase
-      .from('subjects').insert({ name: trimmed, school_id: schoolId }).select().single();
-    if (error) {
-      showFlash('error', error.message.includes('unique') ? `"${trimmed}" already exists.` : error.message);
-    } else if (data) {
-      setSubjects(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
-      setNewSubjectName('');
-      showFlash('success', 'Subject added.');
+      .from('subjects').insert({ name, school_id: schoolId }).select().single();
+    if (error) { toast('error', error.message.includes('unique') ? `"${name}" already exists.` : error.message); return; }
+    if (data) {
+      setSubjects(p => [...p, data].sort((a, b) => a.name.localeCompare(b.name)));
+      toast('success', `Learning area "${name}" added.`);
     }
-    setAddingSubject(false);
   }
 
-  async function editSubject(id: string, name: string) {
+  async function renameSubject(id: string, name: string) {
     const { error } = await supabase.from('subjects').update({ name }).eq('id', id);
-    if (error) { showFlash('error', error.message); return; }
-    setSubjects(prev => prev.map(s => s.id === id ? { ...s, name } : s));
-    showFlash('success', 'Subject updated.');
+    if (error) { toast('error', error.message); return; }
+    setSubjects(p => p.map(s => s.id === id ? { ...s, name } : s));
+    setEditingSubject(null);
+    toast('success', 'Learning area renamed.');
   }
 
   async function deleteSubject(id: string, name: string) {
-    if (!confirm(`Delete subject "${name}"? All its strands and sub-strands will also be deleted.`)) return;
+    if (!confirm(`Delete learning area "${name}"?\nAll its strands and sub-strands will be permanently removed.`)) return;
     const { error } = await supabase.from('subjects').delete().eq('id', id);
-    if (error) { showFlash('error', error.message); return; }
-    setSubjects(prev => prev.filter(s => s.id !== id));
-    setStrands(prev => prev.filter(s => s.subject_id !== id));
-    showFlash('success', 'Subject deleted.');
+    if (error) { toast('error', error.message); return; }
+    setSubjects(p => p.filter(s => s.id !== id));
+    setStrands(p => p.filter(s => s.subject_id !== id));
+    toast('success', `"${name}" deleted.`);
   }
 
-  // ── Strand CRUD ───────────────────────────────────────────────────────────
+  // ── Strand CRUD ─────────────────────────────────────────────────────────────
 
   async function addStrand(subjectId: string, name: string) {
-    const sortOrder = strands.filter(s => s.subject_id === subjectId).length;
+    const order = strands.filter(s => s.subject_id === subjectId).length;
     const { data, error } = await supabase
       .from('strands')
-      .insert({ name, subject_id: subjectId, school_id: schoolId, sort_order: sortOrder })
+      .insert({ name, subject_id: subjectId, school_id: schoolId, sort_order: order })
       .select().single();
-    if (error) { showFlash('error', error.message.includes('unique') ? `"${name}" already exists.` : error.message); return; }
-    if (data) { setStrands(prev => [...prev, data]); showFlash('success', 'Strand added.'); }
+    if (error) { toast('error', error.message.includes('unique') ? `"${name}" already exists.` : error.message); return; }
+    if (data) {
+      setStrands(p => [...p, data]);
+      if (!openSubjects.has(subjectId)) setOpenSubjects(p => new Set([...p, subjectId]));
+      toast('success', `Strand "${name}" added.`);
+    }
   }
 
-  async function editStrand(id: string, name: string) {
+  async function renameStrand(id: string, name: string) {
     const { error } = await supabase.from('strands').update({ name }).eq('id', id);
-    if (error) { showFlash('error', error.message); return; }
-    setStrands(prev => prev.map(s => s.id === id ? { ...s, name } : s));
-    showFlash('success', 'Strand updated.');
+    if (error) { toast('error', error.message); return; }
+    setStrands(p => p.map(s => s.id === id ? { ...s, name } : s));
+    setEditingStrand(null);
+    toast('success', 'Strand renamed.');
   }
 
   async function deleteStrand(id: string, name: string) {
-    if (!confirm(`Delete strand "${name}"? All sub-strands will also be deleted.`)) return;
+    if (!confirm(`Delete strand "${name}"?\nAll sub-strands will be removed.`)) return;
     const { error } = await supabase.from('strands').delete().eq('id', id);
-    if (error) { showFlash('error', error.message); return; }
-    setStrands(prev => prev.filter(s => s.id !== id));
-    setSubStrands(prev => prev.filter(ss => ss.strand_id !== id));
-    showFlash('success', 'Strand deleted.');
+    if (error) { toast('error', error.message); return; }
+    setStrands(p => p.filter(s => s.id !== id));
+    setSubStrands(p => p.filter(ss => ss.strand_id !== id));
+    toast('success', `Strand "${name}" deleted.`);
   }
 
-  // ── Sub-strand CRUD ───────────────────────────────────────────────────────
+  // ── Sub-strand CRUD ─────────────────────────────────────────────────────────
 
   async function addSubStrand(strandId: string, name: string) {
-    const sortOrder = subStrands.filter(ss => ss.strand_id === strandId).length;
+    const order = subStrands.filter(ss => ss.strand_id === strandId).length;
     const { data, error } = await supabase
       .from('sub_strands')
-      .insert({ name, strand_id: strandId, school_id: schoolId, sort_order: sortOrder })
+      .insert({ name, strand_id: strandId, school_id: schoolId, sort_order: order })
       .select().single();
-    if (error) { showFlash('error', error.message.includes('unique') ? `"${name}" already exists.` : error.message); return; }
-    if (data) { setSubStrands(prev => [...prev, data]); showFlash('success', 'Sub-strand added.'); }
+    if (error) { toast('error', error.message.includes('unique') ? `"${name}" already exists.` : error.message); return; }
+    if (data) {
+      setSubStrands(p => [...p, data]);
+      if (!openStrands.has(strandId)) setOpenStrands(p => new Set([...p, strandId]));
+      toast('success', `Sub-strand "${name}" added.`);
+    }
   }
 
-  async function editSubStrand(id: string, name: string) {
+  async function renameSubStrand(id: string, name: string) {
     const { error } = await supabase.from('sub_strands').update({ name }).eq('id', id);
-    if (error) { showFlash('error', error.message); return; }
-    setSubStrands(prev => prev.map(ss => ss.id === id ? { ...ss, name } : ss));
-    showFlash('success', 'Sub-strand updated.');
+    if (error) { toast('error', error.message); return; }
+    setSubStrands(p => p.map(ss => ss.id === id ? { ...ss, name } : ss));
+    setEditingSubStrand(null);
+    toast('success', 'Sub-strand renamed.');
   }
 
   async function deleteSubStrand(id: string, name: string) {
     if (!confirm(`Delete sub-strand "${name}"?`)) return;
     const { error } = await supabase.from('sub_strands').delete().eq('id', id);
-    if (error) { showFlash('error', error.message); return; }
-    setSubStrands(prev => prev.filter(ss => ss.id !== id));
-    showFlash('success', 'Sub-strand deleted.');
+    if (error) { toast('error', error.message); return; }
+    setSubStrands(p => p.filter(ss => ss.id !== id));
+    toast('success', `Sub-strand "${name}" deleted.`);
   }
 
-  // ── Derived ───────────────────────────────────────────────────────────────
+  // ── Render ──────────────────────────────────────────────────────────────────
 
-  const filtered = subjects.filter(s => s.name.toLowerCase().includes(search.toLowerCase()));
+  const filtered = subjects.filter(s =>
+    s.name.toLowerCase().includes(search.toLowerCase())
+  );
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  const totalStrands = strands.length;
+  const totalSubStrands = subStrands.length;
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
-      {/* Header */}
+    <div className="p-6 max-w-4xl mx-auto">
+      {/* Page header */}
       <div className="mb-8">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center">
+        <div className="flex items-center gap-3 mb-1">
+          <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-sm">
             <BookOpen className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Subjects</h1>
+            <h1 className="text-2xl font-bold text-slate-900">Curriculum Setup</h1>
             <p className="text-sm text-slate-500">
-              Manage subjects, strands, and sub-strands for this school.
+              Manage learning areas, strands, and sub-strands. Teachers use this structure to track learner progress.
             </p>
           </div>
         </div>
+
+        {/* Stats strip */}
+        <div className="mt-4 flex gap-3 flex-wrap">
+          {[
+            { icon: BookOpen, label: 'Learning Areas', count: subjects.length, color: 'bg-blue-50 text-blue-700 border-blue-100' },
+            { icon: Layers, label: 'Strands', count: totalStrands, color: 'bg-slate-50 text-slate-700 border-slate-100' },
+            { icon: Atom, label: 'Sub-strands', count: totalSubStrands, color: 'bg-slate-50 text-slate-700 border-slate-100' },
+          ].map(({ icon: Icon, label, count, color }) => (
+            <div key={label} className={`flex items-center gap-2.5 px-4 py-2 rounded-xl border ${color}`}>
+              <Icon className="w-4 h-4 opacity-70" />
+              <span className="text-sm font-semibold">{count}</span>
+              <span className="text-xs opacity-70">{label}</span>
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* Flash */}
+      {/* Flash toast */}
       {flash && (
-        <div className={`flex items-center gap-2 mb-4 px-4 py-3 rounded-xl border text-sm ${
+        <div className={`flex items-center gap-2.5 mb-5 px-4 py-3 rounded-xl border text-sm font-medium transition-all ${
           flash.type === 'success'
             ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
             : 'bg-red-50 border-red-200 text-red-600'
         }`}>
           {flash.type === 'success'
-            ? <CheckCircle className="w-4 h-4 shrink-0" />
+            ? <CheckCircle2 className="w-4 h-4 shrink-0" />
             : <AlertCircle className="w-4 h-4 shrink-0" />}
           {flash.msg}
         </div>
       )}
 
-      {/* Add subject form */}
+      {/* Add subject card */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 mb-5">
-        <h2 className="text-sm font-semibold text-slate-700 mb-3">Add New Subject</h2>
-        <div className="flex gap-3">
-          <input
-            type="text" value={newSubjectName}
-            onChange={e => setNewSubjectName(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && addSubject()}
-            placeholder="e.g. Mathematics, Kiswahili, Science..."
-            className="flex-1 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 transition"
-          />
-          <button
-            onClick={addSubject}
-            disabled={addingSubject || !newSubjectName.trim()}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition shadow-sm"
-          >
-            <Plus className="w-4 h-4" />
-            {addingSubject ? 'Adding...' : 'Add'}
-          </button>
-        </div>
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+          Add New Learning Area
+        </p>
+        <QuickAdd placeholder="e.g. Mathematics, English, Science & Technology…" onAdd={addSubject} />
       </div>
 
       {/* Subject list */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        {/* List header */}
-        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <h2 className="font-semibold text-slate-900 text-sm">All Subjects</h2>
-            <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-medium">
-              {subjects.length}
-            </span>
-          </div>
-          <div className="relative">
+        {/* List toolbar */}
+        <div className="px-5 py-3.5 border-b border-slate-100 flex items-center gap-3">
+          <div className="relative flex-1 max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
             <input
-              type="text" value={search}
+              value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search..."
-              className="border border-slate-200 rounded-xl pl-8 pr-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-44 bg-slate-50"
+              placeholder="Search learning areas…"
+              className="w-full pl-8 pr-3 py-2 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
             />
           </div>
+          <span className="text-xs text-slate-400 ml-auto">{filtered.length} of {subjects.length}</span>
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+          <div className="flex items-center justify-center py-16">
+            <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : filtered.length === 0 ? (
-          <div className="py-14 text-center">
-            <BookOpen className="w-8 h-8 text-slate-200 mx-auto mb-2" />
-            <p className="text-slate-400 text-sm">
-              {subjects.length === 0 ? 'No subjects yet. Add one above.' : 'No subjects match your search.'}
+          <div className="flex flex-col items-center justify-center py-16 text-center px-6">
+            <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center mb-3">
+              <FolderOpen className="w-6 h-6 text-slate-300" />
+            </div>
+            <p className="font-medium text-slate-500">
+              {subjects.length === 0 ? 'No learning areas yet' : 'No results for your search'}
+            </p>
+            <p className="text-xs text-slate-400 mt-1">
+              {subjects.length === 0 ? 'Add your first learning area above.' : 'Try a different keyword.'}
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-slate-50 px-2 py-2">
+          <ul className="divide-y divide-slate-50">
             {filtered.map(subject => {
               const subjectStrands = strands.filter(s => s.subject_id === subject.id);
-              const isExpanded = expandedSubjects.has(subject.id);
+              const isOpen = openSubjects.has(subject.id);
+              const isEditing = editingSubject === subject.id;
 
               return (
-                <div key={subject.id} className="py-1">
-                  {/* Subject row */}
-                  <div className="flex items-center gap-2 py-2.5 px-3 rounded-xl group hover:bg-slate-50 transition">
+                <li key={subject.id}>
+                  {/* ── Subject row ── */}
+                  <div className="group flex items-center gap-2 px-4 py-3.5 hover:bg-slate-50 transition">
                     <button
-                      onClick={() => setExpandedSubjects(prev => {
-                        const next = new Set(prev);
-                        if (next.has(subject.id)) next.delete(subject.id); else next.add(subject.id);
-                        return next;
-                      })}
-                      className="p-0.5 text-slate-400 hover:text-slate-600 transition shrink-0"
+                      onClick={() => toggleSubject(subject.id)}
+                      className="text-slate-400 hover:text-slate-600 transition shrink-0"
                     >
-                      {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                      {isOpen
+                        ? <ChevronDown className="w-4 h-4" />
+                        : <ChevronRight className="w-4 h-4" />}
                     </button>
-                    <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
-                      <BookOpen className="w-3.5 h-3.5 text-blue-600" />
-                    </div>
-                    <span className="flex-1 text-sm font-semibold text-slate-900 truncate">{subject.name}</span>
-                    <span className="text-xs text-slate-400 mr-1">{subjectStrands.length} strand{subjectStrands.length !== 1 ? 's' : ''}</span>
 
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
-                      <button
-                        onClick={() => setAddStrandFor(addStrandFor === subject.id ? null : subject.id)}
-                        className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                        title="Add strand"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                      </button>
-                      <SubjectEditDeleteButtons
-                        name={subject.name}
-                        onSave={name => editSubject(subject.id, name)}
-                        onDelete={() => deleteSubject(subject.id, subject.name)}
-                      />
+                    <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
+                      {isOpen
+                        ? <FolderOpen className="w-4 h-4 text-blue-600" />
+                        : <Folder className="w-4 h-4 text-blue-500" />}
                     </div>
+
+                    {isEditing ? (
+                      <InlineEdit
+                        value={subject.name}
+                        onCommit={name => renameSubject(subject.id, name)}
+                        onCancel={() => setEditingSubject(null)}
+                      />
+                    ) : (
+                      <div className="flex-1 flex items-center gap-3 min-w-0">
+                        <span
+                          className="font-semibold text-slate-900 text-sm truncate cursor-pointer"
+                          onClick={() => toggleSubject(subject.id)}
+                        >
+                          {subject.name}
+                        </span>
+                        <div className="flex items-center gap-2 text-[10px] text-slate-400">
+                          <CountPill n={subjectStrands.length} label="strand" />
+                          <span>·</span>
+                          <CountPill n={subjectStrands.reduce((acc, st) => acc + subStrands.filter(ss => ss.strand_id === st.id).length, 0)} label="sub-strand" />
+                        </div>
+                      </div>
+                    )}
+
+                    {!isEditing && (
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition shrink-0">
+                        <ActionButton
+                          icon={Plus}
+                          label="Add strand"
+                          onClick={() => {
+                            setAddStrandInSubject(s => s === subject.id ? null : subject.id);
+                            if (!openSubjects.has(subject.id)) toggleSubject(subject.id);
+                          }}
+                        />
+                        <ActionButton icon={Pencil} label="Rename" onClick={() => setEditingSubject(subject.id)} />
+                        <ActionButton icon={Trash2} label="Delete" danger onClick={() => deleteSubject(subject.id, subject.name)} />
+                      </div>
+                    )}
                   </div>
 
-                  {/* Add strand inline */}
-                  {addStrandFor === subject.id && (
-                    <div className="ml-4 mb-1">
-                      <AddForm
-                        placeholder="New strand name..."
-                        onAdd={async name => { await addStrand(subject.id, name); setAddStrandFor(null); if (!expandedSubjects.has(subject.id)) setExpandedSubjects(prev => new Set([...prev, subject.id])); }}
-                        indent={1}
-                      />
+                  {/* ── Expanded: strands list ── */}
+                  {isOpen && (
+                    <div className="border-t border-slate-50 bg-slate-50/50">
+                      {/* Add strand form */}
+                      {addStrandInSubject === subject.id && (
+                        <div className="flex items-center gap-3 pl-14 pr-4 py-3 border-b border-slate-100 bg-blue-50/40">
+                          <Layers className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                          <QuickAdd
+                            placeholder="New strand name… (e.g. Numbers, Geometry)"
+                            onAdd={async name => { await addStrand(subject.id, name); }}
+                            autoFocus
+                          />
+                          <button onClick={() => setAddStrandInSubject(null)} className="text-slate-400 hover:text-slate-600">
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
+
+                      {subjectStrands.length === 0 && addStrandInSubject !== subject.id ? (
+                        <div className="pl-14 pr-4 py-4">
+                          <button
+                            onClick={() => { setAddStrandInSubject(subject.id); }}
+                            className="flex items-center gap-2 text-xs text-blue-500 hover:text-blue-700 font-medium transition"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            Add the first strand for {subject.name}
+                          </button>
+                        </div>
+                      ) : (
+                        <ul>
+                          {subjectStrands.map(strand => {
+                            const strandSubStrands = subStrands.filter(ss => ss.strand_id === strand.id);
+                            const isStrandOpen = openStrands.has(strand.id);
+                            const isStrandEditing = editingStrand === strand.id;
+
+                            return (
+                              <li key={strand.id} className="border-t border-slate-100 first:border-0">
+                                {/* ── Strand row ── */}
+                                <div className="group flex items-center gap-2 pl-10 pr-4 py-3 hover:bg-white transition">
+                                  <button
+                                    onClick={() => toggleStrand(strand.id)}
+                                    className="text-slate-300 hover:text-slate-500 transition shrink-0"
+                                  >
+                                    {isStrandOpen
+                                      ? <ChevronDown className="w-3.5 h-3.5" />
+                                      : <ChevronRight className="w-3.5 h-3.5" />}
+                                  </button>
+
+                                  <div className="w-6 h-6 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+                                    <Layers className="w-3 h-3 text-slate-400" />
+                                  </div>
+
+                                  {isStrandEditing ? (
+                                    <InlineEdit
+                                      value={strand.name}
+                                      onCommit={name => renameStrand(strand.id, name)}
+                                      onCancel={() => setEditingStrand(null)}
+                                      size="sm"
+                                    />
+                                  ) : (
+                                    <div className="flex-1 flex items-center gap-2 min-w-0">
+                                      <span
+                                        className="text-sm font-medium text-slate-700 truncate cursor-pointer"
+                                        onClick={() => toggleStrand(strand.id)}
+                                      >
+                                        {strand.name}
+                                      </span>
+                                      <CountPill n={strandSubStrands.length} label="sub-strand" />
+                                    </div>
+                                  )}
+
+                                  {!isStrandEditing && (
+                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition shrink-0">
+                                      <ActionButton
+                                        icon={Plus}
+                                        label="Add sub-strand"
+                                        size="sm"
+                                        onClick={() => {
+                                          setAddSubStrandInStrand(s => s === strand.id ? null : strand.id);
+                                          if (!openStrands.has(strand.id)) toggleStrand(strand.id);
+                                        }}
+                                      />
+                                      <ActionButton icon={Pencil} label="Rename" size="sm" onClick={() => setEditingStrand(strand.id)} />
+                                      <ActionButton icon={Trash2} label="Delete" size="sm" danger onClick={() => deleteStrand(strand.id, strand.name)} />
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* ── Expanded: sub-strands ── */}
+                                {isStrandOpen && (
+                                  <div className="bg-white border-t border-slate-50">
+                                    {/* Add sub-strand form */}
+                                    {addSubStrandInStrand === strand.id && (
+                                      <div className="flex items-center gap-3 pl-20 pr-4 py-2.5 bg-blue-50/40 border-b border-slate-100">
+                                        <Atom className="w-3 h-3 text-blue-400 shrink-0" />
+                                        <QuickAdd
+                                          placeholder="New sub-strand… (e.g. Fractions, Decimals)"
+                                          onAdd={async name => { await addSubStrand(strand.id, name); }}
+                                          autoFocus
+                                        />
+                                        <button onClick={() => setAddSubStrandInStrand(null)} className="text-slate-400 hover:text-slate-600">
+                                          <X className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                    )}
+
+                                    {strandSubStrands.length === 0 && addSubStrandInStrand !== strand.id ? (
+                                      <div className="pl-20 pr-4 py-3">
+                                        <button
+                                          onClick={() => setAddSubStrandInStrand(strand.id)}
+                                          className="flex items-center gap-1.5 text-xs text-blue-500 hover:text-blue-700 font-medium transition"
+                                        >
+                                          <Plus className="w-3 h-3" />
+                                          Add first sub-strand
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <ul>
+                                        {strandSubStrands.map(ss => (
+                                          <li
+                                            key={ss.id}
+                                            className="group flex items-center gap-2 pl-20 pr-4 py-2.5 border-t border-slate-50 hover:bg-slate-50 transition"
+                                          >
+                                            <GripVertical className="w-3 h-3 text-slate-200 shrink-0" />
+                                            <div className="w-5 h-5 rounded-md bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
+                                              <Atom className="w-2.5 h-2.5 text-slate-400" />
+                                            </div>
+
+                                            {editingSubStrand === ss.id ? (
+                                              <InlineEdit
+                                                value={ss.name}
+                                                onCommit={name => renameSubStrand(ss.id, name)}
+                                                onCancel={() => setEditingSubStrand(null)}
+                                                size="sm"
+                                              />
+                                            ) : (
+                                              <span className="flex-1 text-xs text-slate-600 font-medium truncate">
+                                                {ss.name}
+                                              </span>
+                                            )}
+
+                                            {editingSubStrand !== ss.id && (
+                                              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition shrink-0">
+                                                <ActionButton icon={Pencil} label="Rename" size="xs" onClick={() => setEditingSubStrand(ss.id)} />
+                                                <ActionButton icon={Trash2} label="Delete" size="xs" danger onClick={() => deleteSubStrand(ss.id, ss.name)} />
+                                              </div>
+                                            )}
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    )}
+                                  </div>
+                                )}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
                     </div>
                   )}
-
-                  {/* Strands */}
-                  {isExpanded && (
-                    <div>
-                      {subjectStrands.length === 0 ? (
-                        <p className="ml-10 text-xs text-slate-400 py-2">
-                          No strands yet — click <Plus className="w-3 h-3 inline" /> to add one.
-                        </p>
-                      ) : subjectStrands.map(strand => {
-                        const strandSubStrands = subStrands.filter(ss => ss.strand_id === strand.id);
-                        return (
-                          <div key={strand.id}>
-                            {/* Strand row */}
-                            <div className="flex items-center gap-2 py-2 px-3 ml-4 rounded-xl group hover:bg-slate-50 transition">
-                              <button
-                                onClick={() => setAddSubStrandFor(addSubStrandFor === strand.id ? null : strand.id)}
-                                className="p-0.5 text-slate-400 hover:text-slate-600 transition shrink-0"
-                              >
-                                <ChevronRight className={`w-3.5 h-3.5 transition-transform ${addSubStrandFor === strand.id ? 'rotate-90' : ''}`} />
-                              </button>
-                              <div className="w-6 h-6 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
-                                <Layers className="w-3 h-3 text-slate-500" />
-                              </div>
-                              <span className="flex-1 text-sm font-medium text-slate-700 truncate">{strand.name}</span>
-                              <span className="text-xs text-slate-400 mr-1">{strandSubStrands.length}</span>
-                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
-                                <button
-                                  onClick={() => setAddSubStrandFor(addSubStrandFor === strand.id ? null : strand.id)}
-                                  className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Add sub-strand"
-                                >
-                                  <Plus className="w-3 h-3" />
-                                </button>
-                                <SubjectEditDeleteButtons
-                                  name={strand.name}
-                                  onSave={name => editStrand(strand.id, name)}
-                                  onDelete={() => deleteStrand(strand.id, strand.name)}
-                                  small
-                                />
-                              </div>
-                            </div>
-
-                            {/* Add sub-strand inline */}
-                            {addSubStrandFor === strand.id && (
-                              <AddForm
-                                placeholder="New sub-strand name..."
-                                onAdd={name => addSubStrand(strand.id, name)}
-                                indent={2}
-                              />
-                            )}
-
-                            {/* Sub-strands */}
-                            {strandSubStrands.map(ss => (
-                              <div key={ss.id} className="flex items-center gap-2 py-1.5 px-3 ml-8 rounded-xl group hover:bg-slate-50 transition">
-                                <div className="w-5 h-5 rounded-md bg-slate-100 flex items-center justify-center shrink-0">
-                                  <Atom className="w-2.5 h-2.5 text-slate-400" />
-                                </div>
-                                <span className="flex-1 text-xs font-medium text-slate-600 truncate">{ss.name}</span>
-                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
-                                  <SubjectEditDeleteButtons
-                                    name={ss.name}
-                                    onSave={name => editSubStrand(ss.id, name)}
-                                    onDelete={() => deleteSubStrand(ss.id, ss.name)}
-                                    small
-                                  />
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+                </li>
               );
             })}
-          </div>
+          </ul>
         )}
 
         {subjects.length > 0 && (
-          <div className="px-5 py-3 border-t border-slate-100 bg-slate-50">
+          <div className="px-5 py-3 border-t border-slate-100 bg-slate-50 flex items-center gap-4">
             <p className="text-xs text-slate-400">
-              {subjects.length} subject{subjects.length !== 1 ? 's' : ''} · {strands.length} strand{strands.length !== 1 ? 's' : ''} · {subStrands.length} sub-strand{subStrands.length !== 1 ? 's' : ''}
+              {subjects.length} learning area{subjects.length !== 1 ? 's' : ''}
+              {' · '}
+              {totalStrands} strand{totalStrands !== 1 ? 's' : ''}
+              {' · '}
+              {totalSubStrands} sub-strand{totalSubStrands !== 1 ? 's' : ''}
             </p>
           </div>
         )}
+      </div>
+
+      {/* Help callout */}
+      <div className="mt-5 bg-blue-50 border border-blue-100 rounded-2xl px-5 py-4">
+        <p className="text-xs font-semibold text-blue-700 mb-1">How this works</p>
+        <p className="text-xs text-blue-600 leading-relaxed">
+          Structure your curriculum here first. Once you add strands and sub-strands to a learning area,
+          class teachers can open <strong>Tracking Progress</strong> to select a student, pick the sub-strand,
+          enter a competency score, and get an AI-generated CBC comment — ready to share with parents.
+        </p>
       </div>
     </div>
   );
 }
 
-// ── Inline edit + delete buttons ──────────────────────────────────────────────
+// ── Tiny action button ────────────────────────────────────────────────────────
 
-function SubjectEditDeleteButtons({
-  name, onSave, onDelete, small = false,
+function ActionButton({
+  icon: Icon, label, onClick, danger = false, size = 'md',
 }: {
-  name: string;
-  onSave: (newName: string) => Promise<void>;
-  onDelete: () => void;
-  small?: boolean;
+  icon: React.ElementType;
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
+  size?: 'xs' | 'sm' | 'md';
 }) {
-  const [editing, setEditing] = useState(false);
-  const [val, setVal] = useState(name);
-  const [saving, setSaving] = useState(false);
-  const sz = small ? 'w-3 h-3' : 'w-3.5 h-3.5';
-
-  async function commit() {
-    const t = val.trim();
-    if (!t || t === name) { setEditing(false); setVal(name); return; }
-    setSaving(true);
-    await onSave(t);
-    setSaving(false);
-    setEditing(false);
-  }
-
-  if (editing) {
-    return (
-      <div className="flex items-center gap-1">
-        <input
-          autoFocus value={val}
-          onChange={e => setVal(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setEditing(false); setVal(name); } }}
-          className="border border-blue-300 rounded-lg px-2 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 w-32"
-        />
-        <button onClick={commit} disabled={saving} className="p-1 text-blue-600 hover:bg-blue-50 rounded transition">
-          {saving ? <div className={`${sz} border border-blue-500 border-t-transparent rounded-full animate-spin`} /> : <Save className={sz} />}
-        </button>
-        <button onClick={() => { setEditing(false); setVal(name); }} className="p-1 text-slate-400 hover:bg-slate-100 rounded transition">
-          <X className={sz} />
-        </button>
-      </div>
-    );
-  }
-
+  const pad = size === 'xs' ? 'p-1' : 'p-1.5';
+  const iconSz = size === 'xs' ? 'w-2.5 h-2.5' : size === 'sm' ? 'w-3 h-3' : 'w-3.5 h-3.5';
   return (
-    <>
-      <button onClick={() => setEditing(true)} className={`p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition`}>
-        <Pencil className={sz} />
-      </button>
-      <button onClick={onDelete} className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition">
-        <Trash2 className={sz} />
-      </button>
-    </>
+    <button
+      onClick={onClick}
+      title={label}
+      className={`${pad} rounded-lg transition ${
+        danger
+          ? 'text-slate-300 hover:text-red-500 hover:bg-red-50'
+          : 'text-slate-300 hover:text-blue-600 hover:bg-blue-50'
+      }`}
+    >
+      <Icon className={iconSz} />
+    </button>
   );
 }

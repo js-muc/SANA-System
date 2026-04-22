@@ -63,6 +63,7 @@ export type Student = {
   class_id: string | null;
   teacher_id: string;
   school_id: string;
+  parent_email: string;
   created_at: string;
   class?: Class;
 };
@@ -109,7 +110,10 @@ export type CompetencyAssessment = {
   teacher_id: string;
   school_id: string;
   ai_comment: string;
+  ai_comment_for_parent: string;
   teacher_note: string;
+  parent_notification_sent: boolean;
+  parent_notified_at: string | null;
   created_at: string;
   updated_at: string;
   sub_strand?: SubStrand;
