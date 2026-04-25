@@ -262,6 +262,22 @@ export default function MeritList() {
 </body></html>`;
   }
 
+  function downloadMeritList() {
+    if (rows.length === 0) return;
+    const html = buildMeritListHTML();
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const fileName = `Merit-List_${selectedClass?.name ?? 'Class'}_${selectedTerm}_${selectedYear}.html`
+      .replace(/\s+/g, '-');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   function printMeritList() {
     if (rows.length === 0) return;
     const html = buildMeritListHTML();
@@ -346,13 +362,22 @@ export default function MeritList() {
           </div>
 
           {hasData && (
-            <button
-              onClick={printMeritList}
-              className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition shadow-sm"
-            >
-              <Printer className="w-4 h-4" />
-              Download / Print
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={downloadMeritList}
+                className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition shadow-sm"
+              >
+                <Download className="w-4 h-4" />
+                Download
+              </button>
+              <button
+                onClick={printMeritList}
+                className="flex items-center gap-2 border border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-700 hover:text-blue-700 text-sm font-medium px-4 py-2.5 rounded-xl transition"
+              >
+                <Printer className="w-4 h-4" />
+                Print
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -522,13 +547,22 @@ export default function MeritList() {
                 <Info className="w-3.5 h-3.5" />
                 {rows.length} students · Ranked by mean score · {subjects.length} learning areas
               </div>
-              <button
-                onClick={printMeritList}
-                className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition shadow-sm"
-              >
-                <Download className="w-4 h-4" />
-                Download Merit List
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={downloadMeritList}
+                  className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition shadow-sm"
+                >
+                  <Download className="w-4 h-4" />
+                  Download
+                </button>
+                <button
+                  onClick={printMeritList}
+                  className="flex items-center gap-2 border border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-700 hover:text-blue-700 text-sm font-medium px-4 py-2.5 rounded-xl transition"
+                >
+                  <Printer className="w-4 h-4" />
+                  Print
+                </button>
+              </div>
             </div>
           </div>
         </>
