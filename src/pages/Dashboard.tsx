@@ -40,11 +40,7 @@ export default function Dashboard() {
   const isAdmin = profile?.role === 'admin';
   const schoolId = profile?.school_id;
 
-  // Superadmin sees no student data — redirect to their own management page
-  if (isSuperAdmin) {
-    return <SuperAdminSummary navigate={navigate} />;
-  }
-
+  // All hooks must be declared before any conditional return
   const [students, setStudents] = useState<Student[]>([]);
   const [scores, setScores] = useState<Score[]>([]);
   const [teachers, setTeachers] = useState<Profile[]>([]);
@@ -52,6 +48,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Superadmin has no school data to load
+    if (isSuperAdmin) return;
     if (!user) return;
     async function load() {
       const studentsQ = supabase.from('students').select('*, class:classes(*, level:levels(*))');
@@ -127,6 +125,11 @@ export default function Dashboard() {
         average: Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10,
       }));
   }, [scores]);
+
+  // All hooks done — safe to conditionally render
+  if (isSuperAdmin) {
+    return <SuperAdminSummary navigate={navigate} />;
+  }
 
   const greeting = new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening';
 
