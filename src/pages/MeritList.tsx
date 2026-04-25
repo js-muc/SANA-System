@@ -31,18 +31,21 @@ body { font-family:'Segoe UI',Arial,sans-serif; font-size:10px; color:#0f172a; b
 .meta-item { display:flex; gap:5px; }
 .meta-label { font-weight:700; color:#374151; }
 .meta-value { color:#111827; border-bottom:1px solid #94a3b8; min-width:80px; padding-bottom:1px; }
-table { width:100%; border-collapse:collapse; }
-th { background:#1e3a5f; color:#fff; padding:7px 6px; text-align:center; font-size:9.5px; font-weight:700; border:1px solid #334155; white-space:nowrap; }
-th.name-col { text-align:left; }
-td { padding:5px 6px; border:1px solid #e2e8f0; font-size:9.5px; text-align:center; }
-td.name-col { text-align:left; font-weight:600; }
+table { width:100%; border-collapse:collapse; table-layout:fixed; }
+th { background:#1e3a5f; color:#fff; padding:6px 4px; text-align:center; font-size:9px; font-weight:700; border:1px solid #334155; white-space:normal; word-break:break-word; }
+th.name-col { text-align:left; white-space:nowrap; word-break:normal; }
+th.subject-header { padding:4px 2px; vertical-align:bottom; }
+th.subject-header .subject-label { display:inline-block; writing-mode:vertical-rl; transform:rotate(180deg); white-space:nowrap; font-size:8.5px; font-weight:700; letter-spacing:0.03em; max-height:70px; overflow:hidden; text-overflow:ellipsis; }
+th.score-sub-header { font-size:7.5px; background:#334155; padding:3px 2px; }
+td { padding:4px 3px; border:1px solid #e2e8f0; font-size:9px; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+td.name-col { text-align:left; font-weight:600; white-space:normal; word-break:break-word; font-size:9px; }
 td.score-cell { font-weight:700; }
-td.sub-cell { font-size:8.5px; color:#475569; }
+td.sub-cell { font-size:8px; color:#475569; }
 tr:nth-child(even) td { background:#f8fafc; }
-.avg-row td { background:#1e3a5f !important; color:#fff; font-weight:700; font-size:9.5px; }
+.avg-row td { background:#1e3a5f !important; color:#fff; font-weight:700; font-size:8.5px; }
 .pos-cell { font-weight:800; color:#1e3a5f; }
 .footer-note { margin-top:10px; font-size:9px; color:#94a3b8; text-align:center; }
-@media print { body { padding:10px 12px; } }
+@media print { body { padding:10px 12px; } @page { size:A4 landscape; margin:10mm; } }
 `;
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -194,11 +197,11 @@ export default function MeritList() {
 
   function buildMeritListHTML(): string {
     const subjectHeaders = subjects.map(sub =>
-      `<th colspan="2">${sub.name.length > 8 ? sub.name.slice(0, 8) + '…' : sub.name}</th>`
+      `<th colspan="2" class="subject-header"><div class="subject-label">${sub.name}</div></th>`
     ).join('');
 
     const subSubHeaders = subjects.map(() =>
-      `<th style="font-size:8px;background:#334155">Score</th><th style="font-size:8px;background:#334155">Sub</th>`
+      `<th class="score-sub-header">Score</th><th class="score-sub-header">Sub</th>`
     ).join('');
 
     const dataRows = rows.map(row => {
@@ -434,8 +437,22 @@ export default function MeritList() {
                     <th className="px-3 py-3 text-center font-bold w-10 border-r border-slate-700">#</th>
                     <th className="px-4 py-3 text-left font-bold min-w-36 border-r border-slate-700">Student Name</th>
                     {subjects.map(sub => (
-                      <th key={sub.id} colSpan={2} className="px-2 py-3 text-center font-bold border-r border-slate-700 whitespace-nowrap">
-                        {sub.name.length > 10 ? sub.name.slice(0, 10) + '…' : sub.name}
+                      <th key={sub.id} colSpan={2} className="px-2 py-3 text-center font-bold border-r border-slate-700">
+                        <div
+                          style={{
+                            writingMode: 'vertical-rl',
+                            transform: 'rotate(180deg)',
+                            whiteSpace: 'nowrap',
+                            fontSize: '10px',
+                            minHeight: '60px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            margin: '0 auto',
+                          }}
+                        >
+                          {sub.name}
+                        </div>
                       </th>
                     ))}
                     <th className="px-3 py-3 text-center font-bold w-16 border-r border-slate-700">Mean</th>
