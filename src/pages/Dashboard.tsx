@@ -36,8 +36,14 @@ type StudentWithRisk = Student & { risk: StudentRisk };
 export default function Dashboard() {
   const { user, profile, school } = useAuth();
   const navigate = useNavigate();
+  const isSuperAdmin = profile?.role === 'super_admin';
   const isAdmin = profile?.role === 'admin';
   const schoolId = profile?.school_id;
+
+  // Superadmin sees no student data — redirect to their own management page
+  if (isSuperAdmin) {
+    return <SuperAdminSummary navigate={navigate} />;
+  }
 
   const [students, setStudents] = useState<Student[]>([]);
   const [scores, setScores] = useState<Score[]>([]);
@@ -342,6 +348,131 @@ export default function Dashboard() {
           <StudentList title="Safe" icon={CheckCircle} students={safeStudents} riskLevel="safe" onNavigate={navigate} showTeacher={isAdmin} />
         </div>
       )}
+    </div>
+  );
+}
+
+// ── SuperAdmin landing — no student data, system-level stats only ─────────────
+
+function SuperAdminSummary({ navigate }: { navigate: (path: string) => void }) {
+  const { profile } = useAuth();
+  const [schoolCount, setSchoolCount] = useState(0);
+  const [adminCount, setAdminCount] = useState(0);
+  const [teacherCount, setTeacherCount] = useState(0);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      const [schoolsRes, profilesRes] = await Promise.all([
+        supabase.from('schools').select('id', { count: 'exact', head: true }),
+        supabase.from('profiles').select('role, approval_status').neq('role', 'super_admin'),
+      ]);
+      setSchoolCount(schoolsRes.count ?? 0);
+      const profs = profilesRes.data ?? [];
+      setAdminCount(profs.filter(p => p.role === 'admin').length);
+      setTeacherCount(profs.filter(p => p.role === 'teacher').length);
+      setPendingCount(profs.filter(p => p.role === 'admin' && p.approval_status === 'pending').length);
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  const greeting = new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening';
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-7 h-7 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 max-w-4xl mx-auto">
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold text-slate-900">
+          Good {greeting}, {profile?.name?.split(' ')[0] ?? 'System Owner'}
+        </h1>
+        <p className="text-slate-500 mt-1">
+          {pendingCount > 0
+            ? `${pendingCount} admin account${pendingCount !== 1 ? 's' : ''} waiting for approval.`
+            : 'System is running normally. All schools are active.'}
+        </p>
+      </div>
+
+      {/* Pending approval alert */}
+      {pendingCount > 0 && (
+        <div
+          className="flex items-center gap-3 mb-6 bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 cursor-pointer hover:bg-amber-100 transition"
+          onClick={() => navigate('/superadmin')}
+        >
+          <div className="w-8 h-8 bg-amber-100 rounded-xl flex items-center justify-center shrink-0">
+            <AlertTriangle className="w-4 h-4 text-amber-600" />
+          </div>
+          <div className="flex-1">
+            <p className="font-semibold text-amber-800 text-sm">
+              {pendingCount} admin approval{pendingCount !== 1 ? 's' : ''} pending
+            </p>
+            <p className="text-xs text-amber-600 mt-0.5">Click to review in Schools & Admins</p>
+          </div>
+          <ArrowRight className="w-4 h-4 text-amber-500" />
+        </div>
+      )}
+
+      {/* System stats — no student data */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8">
+        {[
+          { label: 'Registered Schools', value: schoolCount, icon: Building2,     bg: 'bg-blue-50',    color: 'text-blue-600' },
+          { label: 'School Admins',      value: adminCount,  icon: UserCog,       bg: 'bg-slate-50',   color: 'text-slate-600' },
+          { label: 'Teachers',           value: teacherCount,icon: Users,         bg: 'bg-emerald-50', color: 'text-emerald-600' },
+          { label: 'Pending Approvals',  value: pendingCount,icon: AlertTriangle, bg: 'bg-amber-50',   color: 'text-amber-600' },
+        ].map(stat => {
+          const Icon = stat.icon;
+          return (
+            <div key={stat.label} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 flex items-center gap-4">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${stat.bg}`}>
+                <Icon className={`w-5 h-5 ${stat.color}`} />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-slate-900">{stat.value}</p>
+                <p className="text-xs text-slate-500 mt-0.5">{stat.label}</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* CTA */}
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 flex items-center gap-5">
+        <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center shrink-0">
+          <Building2 className="w-6 h-6 text-white" />
+        </div>
+        <div className="flex-1">
+          <p className="font-semibold text-slate-900">Manage Schools & Admins</p>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Register new schools, approve admin accounts, and manage user roles across the platform.
+          </p>
+        </div>
+        <button
+          onClick={() => navigate('/superadmin')}
+          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition shadow-sm shrink-0"
+        >
+          Open
+          <ArrowRight className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Scope note */}
+      <div className="mt-5 bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4">
+        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">System Owner Scope</p>
+        <p className="text-xs text-slate-400 leading-relaxed">
+          As System Owner you manage schools and admin access only.
+          Student records, scores, classes, and learning area data are managed exclusively
+          by each school's own admin and teachers within their isolated environment.
+        </p>
+      </div>
     </div>
   );
 }

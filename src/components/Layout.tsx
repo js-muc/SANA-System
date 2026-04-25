@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
-  Brain,
   LayoutDashboard,
   ClipboardList,
   Users,
@@ -112,12 +111,14 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
   return (
     <div className="flex flex-col h-full">
       {/* Brand */}
-      <div className="flex items-center gap-3 px-5 py-5 border-b border-slate-100 shrink-0">
-        <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center shrink-0">
-          <Brain className="w-5 h-5 text-white" />
-        </div>
+      <div className="flex items-center gap-3 px-4 py-4 border-b border-slate-100 shrink-0">
+        <img
+          src="/ChatGPT_Image_Apr_25,_2026,_08_28_17_AM.png"
+          alt="SANA OS"
+          className="w-9 h-9 rounded-xl object-cover shrink-0"
+        />
         <div className="min-w-0">
-          <p className="font-bold text-slate-900 leading-none text-sm">SANA OS</p>
+          <p className="font-black text-slate-900 leading-none text-sm tracking-tight">SANA OS</p>
           <p className="text-[10px] text-slate-400 mt-0.5 leading-none truncate">
             {isSuperAdmin ? 'System Owner' : (school?.name ?? 'Intelligence System')}
           </p>
@@ -235,10 +236,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <Menu className="w-5 h-5 text-slate-600" />
           </button>
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center">
-              <Brain className="w-4 h-4 text-white" />
-            </div>
-            <span className="font-bold text-slate-900 text-sm">SANA OS</span>
+            <img
+              src="/ChatGPT_Image_Apr_25,_2026,_08_28_17_AM.png"
+              alt="SANA OS"
+              className="w-7 h-7 rounded-lg object-cover"
+            />
+            <span className="font-black text-slate-900 text-sm tracking-tight">SANA OS</span>
           </div>
           <div className="w-9" />
         </header>
