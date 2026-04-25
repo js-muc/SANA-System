@@ -17,11 +17,13 @@ import {
   Shield,
   Building2,
   TrendingUp,
+  Trophy,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const teacherOnlyNav = [
   { to: '/scores', icon: ClipboardList, label: 'Enter Scores' },
+  { to: '/merit-list', icon: Trophy, label: 'Merit List' },
   { to: '/progress', icon: TrendingUp, label: 'Tracking Progress' },
   { to: '/students', icon: Users, label: 'My Students' },
   { to: '/reports', icon: FileText, label: 'Reports' },
@@ -35,6 +37,7 @@ const adminOverviewNav = [
 
 const adminToolsNav = [
   { to: '/scores', icon: ClipboardList, label: 'Enter Scores' },
+  { to: '/merit-list', icon: Trophy, label: 'Merit List' },
   { to: '/progress', icon: TrendingUp, label: 'Tracking Progress' },
   { to: '/reports', icon: FileText, label: 'Reports' },
 ];

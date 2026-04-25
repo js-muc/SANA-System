@@ -12,7 +12,9 @@ import {
   Pencil,
   X,
   AlertTriangle,
+  Trophy,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import type { Student, Subject, Class } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -33,6 +35,7 @@ type MissingEntry = {
 
 export default function ScoreInput() {
   const { user, profile } = useAuth();
+  const navigate = useNavigate();
   const schoolId = profile?.school_id ?? null;
   const isAdmin = profile?.role === 'admin';
 
@@ -475,11 +478,18 @@ export default function ScoreInput() {
 
       {/* Feedback banners */}
       {saveSuccess && (
-        <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 mb-4">
+        <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 mb-4 flex-wrap">
           <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
-          <p className="text-sm text-emerald-700 font-medium">
+          <p className="text-sm text-emerald-700 font-medium flex-1">
             {selectedTerm} scores saved successfully!
           </p>
+          <button
+            onClick={() => navigate('/merit-list')}
+            className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 border border-emerald-300 hover:bg-emerald-100 px-3 py-1.5 rounded-xl transition shrink-0"
+          >
+            <Trophy className="w-3.5 h-3.5" />
+            View Merit List
+          </button>
         </div>
       )}
       {saveError && (
