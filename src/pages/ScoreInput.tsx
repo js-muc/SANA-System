@@ -76,16 +76,25 @@ export default function ScoreInput() {
   const [editingName, setEditingName] = useState('');
   const editInputRef = useRef<HTMLInputElement>(null);
 
-  // ── Load all admin-created classes once (scoped to this school) ──────────
+  // ── Load classes: teachers see only their assigned class; admins see all ─
   useEffect(() => {
     if (!user || !schoolId) return;
-    supabase
+    const q = supabase
       .from('classes')
       .select('*, level:levels(*)')
       .eq('school_id', schoolId)
-      .order('name')
-      .then(({ data }) => setClasses(data ?? []));
-  }, [user, schoolId]);
+      .order('name');
+    // Teachers only see the class they are assigned to
+    if (!isAdmin) q.eq('teacher_id', user.id);
+    q.then(({ data }) => setClasses(data ?? []));
+  }, [user, schoolId, isAdmin]);
+
+  // ── Auto-select if teacher has exactly one class ──────────────────────────
+  useEffect(() => {
+    if (!isAdmin && classes.length === 1 && !selectedClassId) {
+      setSelectedClassId(classes[0].id);
+    }
+  }, [classes, isAdmin]);
 
   // ── Load students + subjects when class changes ───────────────────────────
   useEffect(() => {
@@ -358,7 +367,7 @@ export default function ScoreInput() {
         <p className="text-slate-500 mt-1">
           {isAdmin
             ? 'Select any class — view all students and enter scores across all teachers'
-            : 'Select a class and term — existing scores are pre-loaded for editing'}
+            : 'Your assigned class is pre-selected — all subjects for your level load automatically'}
         </p>
         {isAdmin && (
           <div className="flex items-center gap-2 mt-2 text-xs text-blue-600 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2 w-fit">
@@ -522,8 +531,17 @@ export default function ScoreInput() {
       {!selectedClassId ? (
         <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-12 text-center">
           <BookOpen className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-          <p className="font-medium text-slate-600">Select a class to begin</p>
-          <p className="text-sm text-slate-400 mt-1">Subjects load automatically from the class curriculum level.</p>
+          {!isAdmin && classes.length === 0 ? (
+            <>
+              <p className="font-medium text-slate-600">No class assigned yet</p>
+              <p className="text-sm text-slate-400 mt-1">Ask your school admin to assign you to a class.</p>
+            </>
+          ) : (
+            <>
+              <p className="font-medium text-slate-600">Select a class to begin</p>
+              <p className="text-sm text-slate-400 mt-1">Subjects load automatically from the class curriculum level.</p>
+            </>
+          )}
         </div>
       ) : subjects.length === 0 && !subjectsLoading ? (
         <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-12 text-center">

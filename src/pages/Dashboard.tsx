@@ -45,6 +45,8 @@ export default function Dashboard() {
   const [scores, setScores] = useState<Score[]>([]);
   const [teachers, setTeachers] = useState<Profile[]>([]);
   const [classCount, setClassCount] = useState(0);
+  const [levels, setLevels] = useState<{ id: string; name: string; pathway: string | null; sort_order: number }[]>([]);
+  const [classes, setClasses] = useState<{ id: string; level_id: string | null; teacher_id: string | null }[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -67,7 +69,8 @@ export default function Dashboard() {
       if (isAdmin) {
         ops.push(
           supabase.from('profiles').select('*').eq('role', 'teacher').eq('school_id', schoolId!),
-          supabase.from('classes').select('id', { count: 'exact', head: true }).eq('school_id', schoolId!)
+          supabase.from('classes').select('id, level_id, teacher_id').eq('school_id', schoolId!),
+          supabase.from('levels').select('id, name, pathway, sort_order').eq('school_id', schoolId!).order('sort_order'),
         );
       }
 
@@ -76,7 +79,10 @@ export default function Dashboard() {
       setScores(results[1].data ?? []);
       if (isAdmin) {
         setTeachers(results[2].data ?? []);
-        setClassCount(results[3].count ?? 0);
+        const classList = results[3].data ?? [];
+        setClasses(classList);
+        setClassCount(classList.length);
+        setLevels(results[4].data ?? []);
       }
       setLoading(false);
     }
@@ -259,6 +265,45 @@ export default function Dashboard() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Admin: Level breakdown */}
+      {isAdmin && levels.length > 0 && (
+        <div className="mb-8">
+          <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-3">Level Breakdown</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            {levels.map(level => {
+              const levelClasses = classes.filter(c => c.level_id === level.id);
+              const assignedClasses = levelClasses.filter(c => !!c.teacher_id);
+              const levelStudents = students.filter(s => {
+                const cls = classes.find(c => c.id === (s as any).class?.id);
+                return cls?.level_id === level.id;
+              });
+              const displayName = level.pathway ? level.pathway : level.name;
+              return (
+                <button
+                  key={level.id}
+                  onClick={() => navigate('/admin/classes')}
+                  className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 text-left hover:border-blue-200 hover:shadow-md transition-all group"
+                >
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1 truncate">
+                    {displayName}
+                  </p>
+                  <p className="text-xl font-bold text-slate-900">{levelClasses.length}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {levelClasses.length === 1 ? 'class' : 'classes'}
+                  </p>
+                  <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between">
+                    <span className="text-[10px] text-slate-400">
+                      {assignedClasses.length}/{levelClasses.length} assigned
+                    </span>
+                    <ArrowRight className="w-3 h-3 text-slate-300 group-hover:text-blue-500 transition" />
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 
