@@ -25,17 +25,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   async function loadProfile(userId: string) {
-    const { data } = await supabase
+    // Fetch profile first — avoids FK join issues when school_id is null (superadmin)
+    const { data: profileData, error } = await supabase
       .from('profiles')
-      .select('*, school:schools(*)')
+      .select('*')
       .eq('id', userId)
       .maybeSingle();
-    if (data) {
-      const { school: schoolData, ...profileData } = data as Profile & { school: School | null };
-      setProfile(profileData);
-      setSchool(schoolData);
-    } else {
+
+    if (error || !profileData) {
       setProfile(null);
+      setSchool(null);
+      return;
+    }
+
+    setProfile(profileData as Profile);
+
+    // Only fetch school if the profile has one
+    if (profileData.school_id) {
+      const { data: schoolData } = await supabase
+        .from('schools')
+        .select('*')
+        .eq('id', profileData.school_id)
+        .maybeSingle();
+      setSchool(schoolData ?? null);
+    } else {
       setSchool(null);
     }
   }
