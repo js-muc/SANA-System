@@ -654,7 +654,7 @@ export default function ScoreInput() {
                     <td className="px-3 py-3 text-center">
                       <button
                         onClick={() => handleDeleteStudent(row.studentId, row.studentName)}
-                        className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition opacity-0 group-hover:opacity-100"
+                        className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
                         title="Remove student"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
