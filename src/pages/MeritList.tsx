@@ -308,6 +308,28 @@ export default function MeritList() {
     };
   }
 
+  function runActualPrint() {
+  const html = buildMeritListHTML();
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = 'position:fixed;width:0;height:0;border:0;visibility:hidden;';
+  iframe.src = url;
+
+  document.body.appendChild(iframe);
+
+  iframe.onload = () => {
+    iframe.contentWindow?.focus();
+    iframe.contentWindow?.print();
+
+    setTimeout(() => {
+      document.body.removeChild(iframe);
+      URL.revokeObjectURL(url);
+    }, 2000);
+  };
+}
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   const hasData = rows.length > 0 && subjects.length > 0;
@@ -588,6 +610,45 @@ export default function MeritList() {
           </div>
         </>
       )}
+      {showPrintTip && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div className="bg-white rounded-2xl shadow-xl p-6 w-[90%] max-w-sm text-center">
+      
+      <h3 className="text-lg font-bold text-slate-900 mb-2">
+        Print Tip
+      </h3>
+
+      <p className="text-sm text-slate-600 mb-4">
+        Disable <span className="font-semibold">"Headers and Footers"</span> in print settings.
+      </p>
+
+      <div className="flex gap-2 justify-center">
+        
+        {/* Cancel */}
+        <button
+          onClick={() => setShowPrintTip(false)}
+          className="px-4 py-2 rounded-lg border border-slate-200 text-sm"
+        >
+          Cancel
+        </button>
+
+        {/* Continue */}
+        <button
+          onClick={() => {
+            setShowPrintTip(false);
+            setTimeout(() => {
+              runActualPrint();
+            }, 200);
+          }}
+          className="bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold"
+        >
+          Continue
+        </button>
+
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 }
