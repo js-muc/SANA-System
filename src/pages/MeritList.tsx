@@ -17,6 +17,7 @@ import { supabase } from '../lib/supabase';
 import type { Class, Subject, Student, Score } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { getSubLevelInfo, getSubLevelColor, getCBCColor } from '../lib/riskEngine';
+import * as html2pdf from "html2pdf.js";
 
 const TERMS = ['Term 1', 'Term 2', 'Term 3'];
 const CURRENT_YEAR = new Date().getFullYear().toString();
