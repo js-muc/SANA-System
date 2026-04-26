@@ -45,7 +45,7 @@ td.sub-cell { font-size:8px; color:#475569; }
 tr:nth-child(even) td { background:#f8fafc; }
 .avg-row td { background:#1e3a5f !important; color:#fff; font-weight:700; font-size:8.5px; }
 .pos-cell { font-weight:800; color:#1e3a5f; }
-.footer-note { margin-top:10px; font-size:9px; color:#94a3b8; text-align:center; }
+.footer-note { margin-top:12px; font-size:9px; color:#94a3b8; text-align:center; page-break-inside: avoid; }
 @media print { body { padding:10px 12px; } @page { size:A4 landscape; margin:10mm; } }
 `;
 
@@ -275,7 +275,7 @@ export default function MeritList() {
     element.innerHTML = html;
 
     const opt = {
-      margin: 5,
+      margin: [10, 10, 20, 10]
       filename: `Merit-List_${selectedClass?.name ?? 'Class'}_${selectedTerm}_${selectedYear}.pdf`
         .replace(/\s+/g, "-"),
       image: { type: "jpeg", quality: 0.98 },
