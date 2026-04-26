@@ -165,7 +165,11 @@ export default function AdminSubjects() {
   // Show add-sub-strand form inside strand
   const [addSubStrandInStrand, setAddSubStrandInStrand] = useState<string | null>(null);
 
-  const [deleteTarget, setDeleteTarget] = useState<{id: string, name: string} | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string;
+    name: string;
+    type: 'subject' | 'strand' | 'substrand';
+  }   | null>(null);
 
   // ── Load ────────────────────────────────────────────────────────────────────
   const load = useCallback(async () => {
@@ -466,7 +470,7 @@ export default function AdminSubjects() {
                           }}
                         />
                         <ActionButton icon={Pencil} label="Rename" onClick={() => setEditingSubject(subject.id)} />
-                        <ActionButton icon={Trash2} label="Delete" danger onClick={() => deleteSubject(subject.id, subject.name)} />
+                        <ActionButton icon={Trash2} label="Delete" danger onClick={() => setDeleteTarget({ id: subject.id, name: subject.name, type: 'subject' })} />
                       </div>
                     )}
                   </div>
@@ -554,7 +558,7 @@ export default function AdminSubjects() {
                                         }}
                                       />
                                       <ActionButton icon={Pencil} label="Rename" size="sm" onClick={() => setEditingStrand(strand.id)} />
-                                      <ActionButton icon={Trash2} label="Delete" size="sm" danger onClick={() => deleteStrand(strand.id, strand.name)} />
+                                      <ActionButton icon={Trash2} label="Delete" size="sm" danger onClick={() => setDeleteTarget({ id: strand.id, name: strand.name, type: 'strand' })} />
                                     </div>
                                   )}
                                 </div>
@@ -687,7 +691,15 @@ export default function AdminSubjects() {
           onClick={async () => {
             const { id, name } = deleteTarget;
             setDeleteTarget(null);
-            await deleteSubStrand(id, name);
+            const { id, name, type } = deleteTarget;
+
+            if (type === 'substrand') {
+              await deleteSubStrand(id, name);
+            } else if (type === 'strand') {
+              await deleteStrand(id, name);
+            } else if (type === 'subject') {
+              await deleteSubject(id, name);
+            }
           }}
           className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-semibold"
         >
