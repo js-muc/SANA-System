@@ -689,10 +689,9 @@ export default function AdminSubjects() {
 
         <button
           onClick={async () => {
-            const { id, name } = deleteTarget;
-            setDeleteTarget(null);
             const { id, name, type } = deleteTarget;
-
+            setDeleteTarget(null);
+          
             if (type === 'substrand') {
               await deleteSubStrand(id, name);
             } else if (type === 'strand') {
