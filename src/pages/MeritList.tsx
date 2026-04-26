@@ -33,7 +33,7 @@ body { font-family:'Segoe UI',Arial,sans-serif; font-size:10px; color:#0f172a; b
 .meta-label { font-weight:700; color:#374151; }
 .meta-value { color:#111827; border-bottom:1px solid #94a3b8; min-width:80px; padding-bottom:1px; }
 table { width:100%; border-collapse:collapse; table-layout:fixed; }
-th { background:#1e3a5f; color:#fff; padding:6px 4px; text-align:center; font-size:9px; font-weight:700; border:1px solid #334155; white-space:normal; word-break:break-word; }
+th { background:#1e3a5f; color:#fff; padding:6px 4px; text-align:center; font-size:9px; font-weight:700; border:1px solid #334155; white-space:normal; word-break:break-word; min-width:40px; }
 th.name-col { text-align:left; white-space:nowrap; word-break:normal; }
 th.subject-header { padding:6px 4px; height:40px; vertical-align:middle; }
 th.subject-header .subject-label { display:block; font-size:9px; font-weight:700; text-align:center; line-height:1.2; padding:2px 4px; white-space:normal; }
