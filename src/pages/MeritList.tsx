@@ -267,18 +267,22 @@ export default function MeritList() {
 
   function downloadMeritList() {
     if (rows.length === 0) return;
+
     const html = buildMeritListHTML();
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    const fileName = `Merit-List_${selectedClass?.name ?? 'Class'}_${selectedTerm}_${selectedYear}.html`
-      .replace(/\s+/g, '-');
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+
+    const element = document.createElement("div");
+    element.innerHTML = html;
+
+    const opt = {
+      margin: 5,
+      filename: `Merit-List_${selectedClass?.name ?? 'Class'}_${selectedTerm}_${selectedYear}.pdf`
+        .replace(/\s+/g, "-"),
+      image: { type: "jpeg", quality: 0.98 },
+      html2canvas: { scale: 2 },
+      jsPDF: { unit: "mm", format: "a4", orientation: "landscape" },
+    };
+
+    html2pdf().set(opt).from(element).save();
   }
 
   function printMeritList() {
