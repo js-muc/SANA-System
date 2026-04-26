@@ -180,21 +180,24 @@ export default function Reports() {
   }
 
   function downloadReport(reportId: string) {
-    const report = reports.find(r => r.student.id === reportId);
-    if (!report) return;
     const html = buildPrintHTML(reportId);
     if (!html) return;
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    const fileName = `Report-Card_${report.student.name}_${report.term}_${report.year}.html`
-      .replace(/\s+/g, '-');
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+
+    const element = document.createElement("div");
+    element.innerHTML = html;
+
+    const report = reports.find(r => r.student.id === reportId);
+
+    const opt = {
+      margin: 5,
+      filename: `Report-Card_${report?.student.name}_${report?.term}_${report?.year}.pdf`
+        .replace(/\s+/g, "-"),
+      image: { type: "jpeg", quality: 0.98 },
+      html2canvas: { scale: 2 },
+      jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+    };
+
+    html2pdf().set(opt).from(element).save();
   }
 
   function printReport(reportId: string) {
