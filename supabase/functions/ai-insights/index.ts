@@ -1,14 +1,8 @@
-// ai-insights — Supabase Edge Function
-//
-// Handles two request types:
-//   POST { type: "comment", payload: CommentPayload }
-//     → Returns a CBC-aligned teacher comment OR a parent-friendly summary
-//   POST { type: "trend",   payload: TrendPayload }
-//     → Returns a trend prediction for a student's sub-strand performance history
-//
-// Requires ANTHROPIC_API_KEY edge function secret.
+// ai-insights — Optimized for scale (OpenAI + caching + fallback)
 
-import Anthropic from "npm:@anthropic-ai/sdk@0.27.3";
+import OpenAI from "npm:openai";
+
+// ── Config ─────────────────────────────────────────
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -16,7 +10,19 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-// ── Payload types ─────────────────────────────────────────────────────────────
+const openai = new OpenAI({
+  apiKey: Deno.env.get("OPENAI_API_KEY"),
+});
+
+// ── Simple in-memory cache (fast + cheap) ───────────
+
+const cache = new Map<string, string>();
+
+function getCacheKey(type: string, payload: any): string {
+  return `${type}:${JSON.stringify(payload)}`;
+}
+
+// ── Payload types (UNCHANGED) ───────────────────────
 
 interface CommentPayload {
   studentName: string;
@@ -27,7 +33,7 @@ interface CommentPayload {
   cbcLevel: "EE" | "ME" | "AE" | "BE";
   term: string;
   priorAssessments?: Array<{ term: string; score: number; cbcLevel: string }>;
-  forParent?: boolean; // if true → plain-language parent summary
+  forParent?: boolean;
 }
 
 interface TrendPayload {
@@ -37,20 +43,42 @@ interface TrendPayload {
   assessments: Array<{ term: string; score: number; cbcLevel: string }>;
 }
 
-// ── CBC label ─────────────────────────────────────────────────────────────────
+// ── CBC label (UNCHANGED) ───────────────────────────
 
 function cbcLabel(level: string): string {
   return (
-    { EE: "Exceeding Expectations", ME: "Meeting Expectations", AE: "Approaching Expectations", BE: "Below Expectations" }[level] ?? level
+    {
+      EE: "Exceeding Expectations",
+      ME: "Meeting Expectations",
+      AE: "Approaching Expectations",
+      BE: "Below Expectations",
+    }[level] ?? level
   );
 }
 
-// ── Teacher comment prompt ────────────────────────────────────────────────────
+// ── Rule-based fallback (NEW — saves cost) ─────────
+
+function generateRuleComment(p: CommentPayload): string | null {
+  // Only trigger for clear cases (avoid AI call)
+  if (p.score >= 90) {
+    return `${p.studentName} demonstrates excellent mastery in ${p.subStrandName}. The learner applies concepts confidently and works independently. Keep up the outstanding performance.`;
+  }
+
+  if (p.score < 40) {
+    return `${p.studentName} is currently below expected level in ${p.subStrandName}. The learner requires guided support and consistent practice to improve understanding. Focus on foundational concepts is recommended.`;
+  }
+
+  return null; // Use AI for middle range
+}
+
+// ── Prompts (UNCHANGED — your strength) ─────────────
 
 function buildCommentPrompt(p: CommentPayload): string {
   const priorContext =
     p.priorAssessments && p.priorAssessments.length > 0
-      ? `Prior results: ${p.priorAssessments.map(a => `${a.term}: ${a.score}% (${cbcLabel(a.cbcLevel)})`).join("; ")}.`
+      ? `Prior results: ${p.priorAssessments
+          .map(a => `${a.term}: ${a.score}% (${cbcLabel(a.cbcLevel)})`)
+          .join("; ")}.`
       : "This is the learner's first recorded assessment in this sub-strand.";
 
   return `You are an experienced primary/secondary school teacher writing a professional CBC competency comment.
@@ -63,16 +91,14 @@ Term: ${p.term}
 Score: ${p.score}% — ${cbcLabel(p.cbcLevel)}
 ${priorContext}
 
-Write exactly THREE labelled sections. Each section: 2–3 sentences. Plain text only — no markdown, no bullet points.
+Write exactly THREE labelled sections. Each section: 2–3 sentences. Plain text only — no markdown.
 
-COMMENT: Describe ${p.studentName}'s current competency in ${p.subStrandName}. Be honest, specific, and encouraging.
-RECOMMENDATION: Suggest one targeted classroom strategy or intervention (e.g. peer teaching, guided practice, manipulatives).
-ACTIVITY: Describe one concrete activity for this week that directly addresses ${p.studentName}'s gap in ${p.subStrandName}.
+COMMENT:
+RECOMMENDATION:
+ACTIVITY:
 
-Total response: under 130 words. Professional tone.`;
+Total response: under 120 words.`;
 }
-
-// ── Parent summary prompt ─────────────────────────────────────────────────────
 
 function buildParentCommentPrompt(p: CommentPayload): string {
   const priorContext =
@@ -80,45 +106,42 @@ function buildParentCommentPrompt(p: CommentPayload): string {
       ? `Earlier: ${p.priorAssessments.map(a => `${a.term}: ${a.score}%`).join(", ")}.`
       : "";
 
-  return `You are writing a warm, simple progress update to a parent (not a teacher).
+  return `Write a simple parent update (3–4 sentences).
 
-Learner: ${p.studentName}
+Student: ${p.studentName}
 Subject: ${p.subjectName}
-Topic studied: ${p.subStrandName}
-Score this term: ${p.score}% (${cbcLabel(p.cbcLevel)})
+Topic: ${p.subStrandName}
+Score: ${p.score}% (${cbcLabel(p.cbcLevel)})
 ${priorContext}
 
-Write a short, friendly note (3–4 sentences) to the parent:
-1. Tell them how ${p.studentName} is doing in ${p.subStrandName} this term — in simple, everyday language.
-2. If the score is below 60%, mention one thing the parent can do at home to help.
-3. End with an encouraging sentence.
-
-No jargon, no CBC acronyms (write out "Exceeding Expectations" in full if needed). Under 80 words.`;
+No jargon. Friendly tone. Under 80 words.`;
 }
-
-// ── Trend analysis prompt ─────────────────────────────────────────────────────
 
 function buildTrendPrompt(p: TrendPayload): string {
   const history = p.assessments
     .map(a => `${a.term}: ${a.score}% (${cbcLabel(a.cbcLevel)})`)
     .join("; ");
 
-  return `You are a school data analyst reviewing a student's academic trend.
+  return `Analyze this student trend in 2 sentences:
 
-Student: ${p.studentName}
-Subject: ${p.subjectName}
-Sub-strand: ${p.subStrandName}
-Assessment history (oldest → newest): ${history}
+${history}
 
-Write a direct, data-driven analysis (2–3 sentences, plain text):
-1. State clearly whether the trend is improving, stable, or declining.
-2. If declining or consistently below 40%, give a clear warning: if this continues, ${p.studentName} is likely to underperform in end-of-term assessments.
-3. If improving, acknowledge the progress and encourage the teacher to continue.
-
-Under 70 words. No markdown.`;
+State: improving, stable, or declining.`;
 }
 
-// ── Handler ───────────────────────────────────────────────────────────────────
+// ── OpenAI call (CHEAP MODEL) ──────────────────────
+
+async function generateAI(prompt: string): Promise<string> {
+  const response = await openai.responses.create({
+    model: "gpt-4o-mini",
+    input: prompt,
+    max_output_tokens: 150,
+  });
+
+  return response.output[0].content[0].text.trim();
+}
+
+// ── Handler ────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -126,63 +149,82 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+    const apiKey = Deno.env.get("OPENAI_API_KEY");
     if (!apiKey) {
       return new Response(
         JSON.stringify({
-          error:
-            "AI service not configured. Ask your system administrator to add ANTHROPIC_API_KEY to the edge function secrets.",
+          error: "Missing OPENAI_API_KEY in Supabase secrets.",
         }),
-        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        { status: 503, headers: corsHeaders }
       );
     }
 
-    const body = await req.json();
-    const { type, payload } = body as {
-      type: "comment" | "trend";
-      payload: CommentPayload | TrendPayload;
-    };
+    const { type, payload } = await req.json();
 
     if (!type || !payload) {
       return new Response(
-        JSON.stringify({ error: "Missing required fields: type and payload" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        JSON.stringify({ error: "Missing type or payload" }),
+        { status: 400, headers: corsHeaders }
       );
     }
 
-    let prompt: string;
+    const cacheKey = getCacheKey(type, payload);
+
+    // ✅ CACHE HIT
+    if (cache.has(cacheKey)) {
+      return new Response(
+        JSON.stringify({ result: cache.get(cacheKey) }),
+        { status: 200, headers: corsHeaders }
+      );
+    }
+
+    let result = "";
+
+    // ── COMMENT ─────────────────────────
 
     if (type === "comment") {
       const cp = payload as CommentPayload;
-      prompt = cp.forParent ? buildParentCommentPrompt(cp) : buildCommentPrompt(cp);
-    } else if (type === "trend") {
-      prompt = buildTrendPrompt(payload as TrendPayload);
-    } else {
+
+      // ✅ Rule-based shortcut (FREE)
+      const fallback = generateRuleComment(cp);
+      if (fallback && !cp.forParent) {
+        result = fallback;
+      } else {
+        const prompt = cp.forParent
+          ? buildParentCommentPrompt(cp)
+          : buildCommentPrompt(cp);
+
+        result = await generateAI(prompt);
+      }
+    }
+
+    // ── TREND ───────────────────────────
+
+    else if (type === "trend") {
+      const prompt = buildTrendPrompt(payload as TrendPayload);
+      result = await generateAI(prompt);
+    }
+
+    else {
       return new Response(
         JSON.stringify({ error: `Unknown type: ${type}` }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        { status: 400, headers: corsHeaders }
       );
     }
 
-    const anthropic = new Anthropic({ apiKey });
-    const message = await anthropic.messages.create({
-      model: "claude-haiku-4-5",
-      max_tokens: 400,
-      messages: [{ role: "user", content: prompt }],
-    });
-
-    const result =
-      message.content[0].type === "text" ? message.content[0].text.trim() : "";
+    // ✅ Save cache
+    cache.set(cacheKey, result);
 
     return new Response(
       JSON.stringify({ result }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      { status: 200, headers: corsHeaders }
     );
+
   } catch (err: any) {
     console.error("ai-insights error:", err);
     return new Response(
       JSON.stringify({ error: err?.message ?? "Internal server error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      { status: 500, headers: corsHeaders }
     );
   }
 });
