@@ -289,18 +289,14 @@ export default function MeritList() {
   }
 
   function printMeritList() {
-    if (rows.length === 0) return;
+  if (rows.length === 0) return;
 
-    if (hasSeenPrintTip) {
-      runActualPrint(); // go straight to print
-    } else {
-      setShowPrintTip(false);
-      setHasSeenPrintTip(true); // remember user already saw tip
-
-      setTimeout(() => {
-        runActualPrint();
-      }, 200);
+  if (hasSeenPrintTip) {
+    runActualPrint(); // already seen → print directly
+  } else {
+    setShowPrintTip(true); // first time → show modal
   }
+}
    
 
   function runActualPrint() {
@@ -631,6 +627,8 @@ export default function MeritList() {
         <button
           onClick={() => {
             setShowPrintTip(false);
+            setHasSeenPrintTip(true); // mark as seen
+
             setTimeout(() => {
               runActualPrint();
             }, 200);
