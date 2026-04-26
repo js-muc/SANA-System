@@ -228,7 +228,6 @@ export default function AdminSubjects() {
   }
 
   async function deleteSubject(id: string, name: string) {
-    if (!confirm(`Delete learning area "${name}"?\nAll its strands and sub-strands will be permanently removed.`)) return;
     const { error } = await supabase.from('subjects').delete().eq('id', id);
     if (error) { toast('error', error.message); return; }
     setSubjects(p => p.filter(s => s.id !== id));
@@ -261,7 +260,6 @@ export default function AdminSubjects() {
   }
 
   async function deleteStrand(id: string, name: string) {
-    if (!confirm(`Delete strand "${name}"?\nAll sub-strands will be removed.`)) return;
     const { error } = await supabase.from('strands').delete().eq('id', id);
     if (error) { toast('error', error.message); return; }
     setStrands(p => p.filter(s => s.id !== id));
@@ -620,7 +618,7 @@ export default function AdminSubjects() {
                                             {editingSubStrand !== ss.id && (
                                               <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition shrink-0">
                                                 <ActionButton icon={Pencil} label="Rename" size="xs" onClick={() => setEditingSubStrand(ss.id)} />
-                                                <ActionButton icon={Trash2} label="Delete" size="xs" danger onClick={() => setDeleteTarget({ id: ss.id, name: ss.name })} />
+                                                <ActionButton icon={Trash2} label="Delete" size="xs" danger onClick={() => setDeleteTarget({ id: ss.id, name: ss.name, type: 'substrand' })} />
                                               </div>
                                             )}
                                           </li>
@@ -669,7 +667,9 @@ export default function AdminSubjects() {
     <div className="bg-white rounded-2xl shadow-xl p-6 w-[90%] max-w-sm text-center">
 
       <h3 className="text-lg font-bold text-slate-900 mb-2">
-        Delete Sub-strand
+        {deleteTarget.type === 'subject' && 'Delete Learning Area'}
+        {deleteTarget.type === 'strand' && 'Delete Strand'}
+        {deleteTarget.type === 'substrand' && 'Delete Sub-strand'}
       </h3>
 
       <p className="text-sm text-slate-600 mb-4">
