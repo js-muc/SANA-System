@@ -275,7 +275,7 @@ export default function MeritList() {
     element.innerHTML = html;
 
     const opt = {
-      margin: [10, 10, 20, 10]
+      margin: [10, 10, 20, 10],
       filename: `Merit-List_${selectedClass?.name ?? 'Class'}_${selectedTerm}_${selectedYear}.pdf`
         .replace(/\s+/g, "-"),
       image: { type: "jpeg", quality: 0.98 },
