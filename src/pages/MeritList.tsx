@@ -72,6 +72,7 @@ export default function MeritList() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<StudentRow[]>([]);
+  const [showPrintTip, setShowPrintTip] = useState(false);
 
   // Load classes
   useEffect(() => {
@@ -288,7 +289,8 @@ export default function MeritList() {
 
   function printMeritList() {
     if (rows.length === 0) return;
-    alert("For clean print, disable 'Headers and Footers' in print settings.");
+    setShowPrintTip(true);
+    return;
     const html = buildMeritListHTML();
     const blob = new Blob([html], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
