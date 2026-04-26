@@ -446,15 +446,11 @@ export default function MeritList() {
                       <th key={sub.id} colSpan={2} className="px-2 py-3 text-center font-bold border-r border-slate-700">
                         <div
                           style={{
-                            writingMode: 'vertical-rl',
-                            transform: 'rotate(180deg)',
-                            whiteSpace: 'nowrap',
                             fontSize: '10px',
-                            minHeight: '60px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            margin: '0 auto',
+                            textAlign: 'center',
+                            lineHeight: '1.2',
+                            padding: '2px 4px',
+                            whiteSpace: 'normal',
                           }}
                         >
                           {sub.name}
