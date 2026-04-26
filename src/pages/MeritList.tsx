@@ -287,6 +287,7 @@ export default function MeritList() {
 
   function printMeritList() {
     if (rows.length === 0) return;
+    alert("For clean print, disable 'Headers and Footers' in print settings.");
     const html = buildMeritListHTML();
     const blob = new Blob([html], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
