@@ -165,6 +165,8 @@ export default function AdminSubjects() {
   // Show add-sub-strand form inside strand
   const [addSubStrandInStrand, setAddSubStrandInStrand] = useState<string | null>(null);
 
+  const [deleteTarget, setDeleteTarget] = useState<{id: string, name: string} | null>(null);
+
   // ── Load ────────────────────────────────────────────────────────────────────
   const load = useCallback(async () => {
     const [s, st, ss] = await Promise.all([
@@ -288,9 +290,24 @@ export default function AdminSubjects() {
   }
 
   async function deleteSubStrand(id: string, name: string) {
-    if (!confirm(`Delete sub-strand "${name}"?`)) return;
-    const { error } = await supabase.from('sub_strands').delete().eq('id', id);
-    if (error) { toast('error', error.message); return; }
+    
+    const { data, error } = await supabase
+      .from('sub_strands')
+      .delete()
+      .eq('id', id)
+      .select();
+ 
+ console.log("DELETE RESULT:", { data, error });
+
+ if (error) {
+   toast('error', error.message);
+   return;
+ }
+
+ if (!data || data.length === 0) {
+   toast('error', 'Delete failed: no rows affected.');
+   return;
+ }
     setSubStrands(p => p.filter(ss => ss.id !== id));
     toast('success', `Sub-strand "${name}" deleted.`);
   }
@@ -581,6 +598,7 @@ export default function AdminSubjects() {
                                             <div className="w-5 h-5 rounded-md bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
                                               <Atom className="w-2.5 h-2.5 text-slate-400" />
                                             </div>
+                                            
 
                                             {editingSubStrand === ss.id ? (
                                               <InlineEdit
