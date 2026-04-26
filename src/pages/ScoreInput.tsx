@@ -76,6 +76,11 @@ export default function ScoreInput() {
   const [editingName, setEditingName] = useState('');
   const editInputRef = useRef<HTMLInputElement>(null);
 
+  const [deleteStudentTarget, setDeleteStudentTarget] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+
   // ── Load classes: teachers see only their assigned class; admins see all ─
   useEffect(() => {
     if (!user || !schoolId) return;
@@ -295,7 +300,6 @@ export default function ScoreInput() {
 
   // ── Delete student ────────────────────────────────────────────────────────
   async function handleDeleteStudent(id: string, name: string) {
-    if (!confirm(`Remove "${name}" from this class? All their scores will also be deleted.`)) return;
     await supabase.from('students').delete().eq('id', id);
     const updated = students.filter(s => s.id !== id);
     setStudents(updated);
@@ -653,7 +657,10 @@ export default function ScoreInput() {
                     {/* Actions */}
                     <td className="px-3 py-3 text-center">
                       <button
-                        onClick={() => handleDeleteStudent(row.studentId, row.studentName)}
+                        onClick={() => setDeleteStudentTarget({
+                           id: row.studentId,
+                           name: row.studentName
+                        })}
                         className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
                         title="Remove student"
                       >
@@ -739,6 +746,46 @@ export default function ScoreInput() {
           </div>
         </div>
       )}
+      {deleteStudentTarget && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div className="bg-white rounded-2xl shadow-xl p-6 w-[90%] max-w-sm text-center">
+
+      <h3 className="text-lg font-bold text-slate-900 mb-2">
+        Remove Student
+      </h3>
+
+      <p className="text-sm text-slate-600 mb-4">
+        Remove <span className="font-semibold">"{deleteStudentTarget.name}"</span> from this class?
+        <br />
+        <span className="text-xs text-red-500">
+          All their scores will also be deleted.
+        </span>
+      </p>
+
+      <div className="flex gap-2 justify-center">
+
+        <button
+          onClick={() => setDeleteStudentTarget(null)}
+          className="px-4 py-2 rounded-lg border border-slate-200 text-sm"
+        >
+          Cancel
+        </button>
+
+        <button
+          onClick={async () => {
+            const { id, name } = deleteStudentTarget;
+            setDeleteStudentTarget(null);
+            await handleDeleteStudent(id, name);
+          }}
+          className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-semibold"
+        >
+          Remove
+        </button>
+
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 }
