@@ -301,6 +301,7 @@ export default function MeritList() {
    
 
   function runActualPrint() {
+    if (rows.length === 0) return;
   const html = buildMeritListHTML();
   const blob = new Blob([html], { type: 'text/html' });
   const url = URL.createObjectURL(blob);
