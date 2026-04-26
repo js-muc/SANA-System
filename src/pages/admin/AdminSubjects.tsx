@@ -616,7 +616,7 @@ export default function AdminSubjects() {
                                             {editingSubStrand !== ss.id && (
                                               <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition shrink-0">
                                                 <ActionButton icon={Pencil} label="Rename" size="xs" onClick={() => setEditingSubStrand(ss.id)} />
-                                                <ActionButton icon={Trash2} label="Delete" size="xs" danger onClick={() => deleteSubStrand(ss.id, ss.name)} />
+                                                <ActionButton icon={Trash2} label="Delete" size="xs" danger onClick={() => setDeleteTarget({ id: ss.id, name: ss.name })} />
                                               </div>
                                             )}
                                           </li>
@@ -660,6 +660,44 @@ export default function AdminSubjects() {
           enter a competency score, and get an AI-generated CBC comment — ready to share with parents.
         </p>
       </div>
+      {deleteTarget && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div className="bg-white rounded-2xl shadow-xl p-6 w-[90%] max-w-sm text-center">
+
+      <h3 className="text-lg font-bold text-slate-900 mb-2">
+        Delete Sub-strand
+      </h3>
+
+      <p className="text-sm text-slate-600 mb-4">
+        Are you sure you want to delete
+        <br />
+        <span className="font-semibold">"{deleteTarget.name}"</span>?
+      </p>
+
+      <div className="flex gap-2 justify-center">
+
+        <button
+          onClick={() => setDeleteTarget(null)}
+          className="px-4 py-2 rounded-lg border border-slate-200 text-sm"
+        >
+          Cancel
+        </button>
+
+        <button
+          onClick={async () => {
+            const { id, name } = deleteTarget;
+            setDeleteTarget(null);
+            await deleteSubStrand(id, name);
+          }}
+          className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-semibold"
+        >
+          Delete
+        </button>
+
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 }
