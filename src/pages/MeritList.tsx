@@ -13,6 +13,7 @@ import { useEffect, useState, useMemo, useCallback } from 'react';
 import {
   Trophy, Printer, BookOpen, ChevronDown, Info, Download,
 } from 'lucide-react';
+import React from 'react';
 import { supabase } from '../lib/supabase';
 import type { Class, Subject, Student, Score } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -617,7 +618,10 @@ export default function MeritList() {
         
         {/* Cancel */}
         <button
-          onClick={() => setShowPrintTip(false)}
+          onClick={() => {
+            setShowPrintTip(false);
+            setHasSeenPrintTip(true); // don't show again
+          }}
           className="px-4 py-2 rounded-lg border border-slate-200 text-sm"
         >
           Cancel
@@ -646,5 +650,3 @@ export default function MeritList() {
   );
 }
 
-// Need React for React.Fragment in TSX
-import React from 'react';
