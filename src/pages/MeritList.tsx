@@ -38,7 +38,7 @@ th.name-col { text-align:left; white-space:nowrap; word-break:normal; }
 th.subject-header { padding:6px 4px; height:40px; vertical-align:middle; }
 th.subject-header .subject-label { display:block; font-size:9px; font-weight:700; text-align:center; line-height:1.2; padding:2px 4px; white-space:normal; }
 th.score-sub-header { font-size:7.5px; background:#334155; padding:3px 2px; }
-td { padding:4px 3px; border:1px solid #e2e8f0; font-size:9px; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+td { padding:4px 3px; border:1px solid #e2e8f0; font-size:9px; text-align:center; overflow:visible; text-overflow:ellipsis; white-space:normal; }
 td.name-col { text-align:left; font-weight:600; white-space:normal; word-break:break-word; font-size:9px; }
 td.score-cell { font-weight:700; }
 td.sub-cell { font-size:8px; color:#475569; }
