@@ -73,6 +73,7 @@ export default function MeritList() {
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<StudentRow[]>([]);
   const [showPrintTip, setShowPrintTip] = useState(false);
+  const [hasSeenPrintTip, setHasSeenPrintTip] = useState(false);
 
   // Load classes
   useEffect(() => {
@@ -289,24 +290,18 @@ export default function MeritList() {
 
   function printMeritList() {
     if (rows.length === 0) return;
-    setShowPrintTip(true);
-    return;
-    const html = buildMeritListHTML();
-    const blob = new Blob([html], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const iframe = document.createElement('iframe');
-    iframe.style.cssText = 'position:fixed;width:0;height:0;border:0;visibility:hidden;';
-    iframe.src = url;
-    document.body.appendChild(iframe);
-    iframe.onload = () => {
-      iframe.contentWindow?.focus();
-      iframe.contentWindow?.print();
+
+    if (hasSeenPrintTip) {
+      runActualPrint(); // go straight to print
+    } else {
+      setShowPrintTip(false);
+      setHasSeenPrintTip(true); // remember user already saw tip
+
       setTimeout(() => {
-        document.body.removeChild(iframe);
-        URL.revokeObjectURL(url);
-      }, 2000);
-    };
+        runActualPrint();
+      }, 200);
   }
+   
 
   function runActualPrint() {
   const html = buildMeritListHTML();
