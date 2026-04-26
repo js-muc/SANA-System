@@ -13,7 +13,7 @@ import {
   FileText, ChevronDown, ChevronUp, Printer, Sparkles, Search, Download,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import * as html2pdf from "html2pdf.js";
+import html2pdf from "html2pdf.js";
 import type { Student, Score } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import {
