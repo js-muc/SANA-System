@@ -197,7 +197,7 @@ export default function Reports() {
       jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
     };
 
-    html2pdf().set(opt).from(element).save();
+    (html2pdf as any)().set(opt).from(element).save();
   }
 
   function printReport(reportId: string) {
