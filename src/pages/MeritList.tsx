@@ -283,7 +283,7 @@ export default function MeritList() {
       jsPDF: { unit: "mm", format: "a4", orientation: "landscape" },
     };
 
-    html2pdf().set(opt).from(element).save();
+    (html2pdf as any)().set(opt).from(element).save();
   }
 
   function printMeritList() {
