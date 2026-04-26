@@ -35,8 +35,8 @@ body { font-family:'Segoe UI',Arial,sans-serif; font-size:10px; color:#0f172a; b
 table { width:100%; border-collapse:collapse; table-layout:fixed; }
 th { background:#1e3a5f; color:#fff; padding:6px 4px; text-align:center; font-size:9px; font-weight:700; border:1px solid #334155; white-space:normal; word-break:break-word; }
 th.name-col { text-align:left; white-space:nowrap; word-break:normal; }
-th.subject-header { padding:4px 2px; vertical-align:bottom; }
-th.subject-header .subject-label { display:inline-block; writing-mode:vertical-rl; transform:rotate(180deg); white-space:nowrap; font-size:8.5px; font-weight:700; letter-spacing:0.03em; max-height:70px; overflow:hidden; text-overflow:ellipsis; }
+th.subject-header { padding:6px 4px; height:40px; vertical-align:middle; }
+th.subject-header .subject-label { display:block; font-size:9px; font-weight:700; text-align:center; line-height:1.2; padding:2px 4px; white-space:normal; }
 th.score-sub-header { font-size:7.5px; background:#334155; padding:3px 2px; }
 td { padding:4px 3px; border:1px solid #e2e8f0; font-size:9px; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 td.name-col { text-align:left; font-weight:600; white-space:normal; word-break:break-word; font-size:9px; }
