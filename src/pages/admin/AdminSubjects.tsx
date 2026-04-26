@@ -676,7 +676,14 @@ export default function AdminSubjects() {
         Are you sure you want to delete
         <br />
         <span className="font-semibold">"{deleteTarget.name}"</span>?
-      </p>
+        <br />
+        {deleteTarget.type === 'subject' && (
+        <span className="text-xs text-red-500">All strands and sub-strands will also be removed.</span>
+       )}
+       {deleteTarget.type === 'strand' && (
+       <span className="text-xs text-red-500">All sub-strands under this strand will be removed.</span>
+       )}
+     </p>
 
       <div className="flex gap-2 justify-center">
 
