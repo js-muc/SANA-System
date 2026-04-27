@@ -72,6 +72,7 @@ export default function AdminLevels() {
       supabase.from('level_subjects').select('*'),
     ]);
     const levelList = levelsRes.data ?? [];
+    console.log("LEVELS FROM DB:", levelList);
     setLevels(levelList);
     setSubjects(subjectsRes.data ?? []);
     setLevelSubjects(lsRes.data ?? []);
