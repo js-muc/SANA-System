@@ -13,7 +13,7 @@
   ## Changes
   - levels: drop global name unique → add unique(name, school_id), add pathway column
   - subjects: drop global name unique → add unique(name, school_id)
-  - Seed: Primary, Junior Secondary, Senior Secondary (STEM/Social Science/Sports & Career)
+  - Seed: Primary, Junior Secondary, Senior Secondary (STEM/Social Science/Arts & sports)
   - Seed: Mathematics, English, Kiswahili, Science, Social Studies, CRE/IRE, Creative Arts, PE
 */
 
