@@ -69,7 +69,6 @@ export default function AdminLevels() {
     const [levelsRes, subjectsRes, lsRes] = await Promise.all([
   supabase.from('levels')
     .select('*')
-    .select('*')
     .order('sort_order'),
 
   supabase.from('subjects')
