@@ -149,8 +149,8 @@ console.log("LEVELS ERROR:", levelsRes.error);
   }
 
   // Partition levels
-  const primaryLevel = levels.find(l => l.name === 'Primary' || (!l.pathway && l.sort_order === 1));
-  const juniorLevel = levels.find(l => l.name === 'Junior Secondary' || (!l.pathway && l.sort_order === 2));
+  const primaryLevel = levels.find(l => l.sort_order === 1);
+  const juniorLevel = levels.find(l => l.sort_order === 2);
   const seniorLevels = levels.filter(l => l.pathway);
 
   const selectedLevel = levels.find(l => l.id === selectedLevelId);
