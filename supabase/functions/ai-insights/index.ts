@@ -138,15 +138,7 @@ async function generateAI(prompt: string): Promise<string> {
     max_output_tokens: 150,
   });
 
-  // ✅ SAFE extraction (no crash)
-  const text = response.output_text;
-
-  if (!text) {
-    console.error("OpenAI empty response:", response);
-    throw new Error("AI returned empty response");
-  }
-
-  return text.trim();
+  return response.output[0].content[0].text.trim();
 }
 
 // ── Handler ────────────────────────────────────────
@@ -168,7 +160,6 @@ Deno.serve(async (req: Request) => {
     }
 
     const { type, payload } = await req.json();
-    console.log("AI REQUEST:", { type, payload });
 
     if (!type || !payload) {
       return new Response(
@@ -204,7 +195,6 @@ Deno.serve(async (req: Request) => {
           : buildCommentPrompt(cp);
 
         result = await generateAI(prompt);
-        console.log("AI RESULT:", result);
       }
     }
 
@@ -213,7 +203,6 @@ Deno.serve(async (req: Request) => {
     else if (type === "trend") {
       const prompt = buildTrendPrompt(payload as TrendPayload);
       result = await generateAI(prompt);
-      console.log("AI RESULT:", result);
     }
 
     else {
