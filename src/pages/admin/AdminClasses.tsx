@@ -51,6 +51,7 @@ export default function AdminClasses() {
     ]);
     setClasses(classesRes.data ?? []);
     const levelList = levelsRes.data ?? [];
+    console.log("LEVELS FROM DB:", levelList);
     setLevels(levelList);
     if (levelList.length > 0 && !newLevelId) setNewLevelId(levelList[0].id);
     setTeachers(teachersRes.data ?? []);
