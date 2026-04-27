@@ -40,7 +40,7 @@ export default function AdminClasses() {
   const [assigningTeacherId, setAssigningTeacherId] = useState('');
   const [savingAssignment, setSavingAssignment] = useState(false);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { if (profile?.school_id) load(); }, [profile?.school_id]);
 
   async function load() {
     const schoolId = profile!.school_id;

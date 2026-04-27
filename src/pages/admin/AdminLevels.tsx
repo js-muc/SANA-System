@@ -63,7 +63,7 @@ export default function AdminLevels() {
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { if (schoolId) load(); }, [schoolId]);
 
   async function load() {
     const [levelsRes, subjectsRes, lsRes] = await Promise.all([
