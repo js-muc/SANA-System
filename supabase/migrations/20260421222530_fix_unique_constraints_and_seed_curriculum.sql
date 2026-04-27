@@ -68,7 +68,7 @@ CROSS JOIN (
     ('Junior Secondary',                       2, NULL),
     ('Senior Secondary – STEM',                3, 'STEM'),
     ('Senior Secondary – Social Science',      4, 'Social Science'),
-    ('Senior Secondary – Sports & Career',     5, 'Sports & Career')
+    ('Senior Secondary – Arts & Sports',     5, 'Arts & Sports')
 ) AS lvl(name, sort_order, pathway)
 WHERE NOT EXISTS (
   SELECT 1 FROM levels l WHERE l.school_id = s.id
