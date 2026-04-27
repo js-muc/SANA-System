@@ -15,7 +15,7 @@ const LEVEL_DISPLAY: Record<string, { label: string; icon: React.ElementType; co
   'Junior Secondary School': { label: 'Junior Secondary', icon: Layers, color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-200' },
   STEM: { label: 'Senior — STEM', icon: FlaskConical, color: 'text-sky-700', bg: 'bg-sky-50', border: 'border-sky-200' },
   'Social Science': { label: 'Senior — Social Science', icon: Globe, color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200' },
-  'Sports & Career': { label: 'Senior — Sports & Career', icon: Trophy, color: 'text-rose-700', bg: 'bg-rose-50', border: 'border-rose-200' },
+  'Arts & Sports': { label: 'Senior — Arts & Sports', icon: Trophy, color: 'text-rose-700', bg: 'bg-rose-50', border: 'border-rose-200' },
 };
 
 function getLevelMeta(level: Level) {
