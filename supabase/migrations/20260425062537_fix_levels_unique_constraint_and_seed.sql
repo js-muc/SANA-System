@@ -36,7 +36,7 @@ BEGIN
         ('Junior Secondary School', 2, school_record.id, NULL),
         ('Senior Secondary School', 3, school_record.id, 'STEM'),
         ('Senior Secondary School', 4, school_record.id, 'Social Science'),
-        ('Senior Secondary School', 5, school_record.id, 'Sports & Career');
+        ('Senior Secondary School', 5, school_record.id, 'Arts & Sports');
     END IF;
   END LOOP;
 END $$;
