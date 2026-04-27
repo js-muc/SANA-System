@@ -168,6 +168,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const { type, payload } = await req.json();
+    console.log("AI REQUEST:", { type, payload });
 
     if (!type || !payload) {
       return new Response(
@@ -203,6 +204,7 @@ Deno.serve(async (req: Request) => {
           : buildCommentPrompt(cp);
 
         result = await generateAI(prompt);
+        console.log("AI RESULT:", result);
       }
     }
 
@@ -211,6 +213,7 @@ Deno.serve(async (req: Request) => {
     else if (type === "trend") {
       const prompt = buildTrendPrompt(payload as TrendPayload);
       result = await generateAI(prompt);
+      console.log("AI RESULT:", result);
     }
 
     else {
