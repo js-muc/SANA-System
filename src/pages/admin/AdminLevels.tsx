@@ -67,6 +67,15 @@ export default function AdminLevels() {
 
   async function load() {
     const [levelsRes, subjectsRes, lsRes] = await Promise.all([
+  supabase.from('levels').select('*').eq('school_id', schoolId!).order('sort_order'),
+  supabase.from('subjects').select('*').eq('school_id', schoolId!).order('name'),
+  supabase.from('level_subjects').select('*'),
+]);
+
+// 🔴 ADD THIS BLOCK
+console.log("SCHOOL ID USED:", schoolId);
+console.log("LEVELS RESPONSE:", levelsRes);
+console.log("LEVELS ERROR:", levelsRes.error);
       supabase.from('levels').select('*').eq('school_id', schoolId!).order('sort_order'),
       supabase.from('subjects').select('*').eq('school_id', schoolId!).order('name'),
       supabase.from('level_subjects').select('*'),
