@@ -128,6 +128,7 @@ console.log("LEVELS ERROR:", levelsRes.error);
     const toInsert = [...selectedSubjectIds].filter(id => !currentIds.has(id)).map(id => ({
       level_id: selectedLevelId,
       subject_id: id,
+      school_id: schoolId,
     }));
 
     const ops: Promise<any>[] = [];
