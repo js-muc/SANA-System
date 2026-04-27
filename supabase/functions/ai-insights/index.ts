@@ -138,7 +138,15 @@ async function generateAI(prompt: string): Promise<string> {
     max_output_tokens: 150,
   });
 
-  return response.output[0].content[0].text.trim();
+  // ✅ SAFE extraction (no crash)
+  const text = response.output_text;
+
+  if (!text) {
+    console.error("OpenAI empty response:", response);
+    throw new Error("AI returned empty response");
+  }
+
+  return text.trim();
 }
 
 // ── Handler ────────────────────────────────────────
