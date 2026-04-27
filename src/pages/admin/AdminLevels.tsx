@@ -86,7 +86,7 @@ console.log("SCHOOL ID USED:", schoolId);
 console.log("LEVELS RESPONSE:", levelsRes);
 console.log("LEVELS ERROR:", levelsRes.error);
       
-    ]);
+  
     const levelList = levelsRes.data ?? [];
     console.log("LEVELS FROM DB:", levelList);
     setLevels(levelList);
