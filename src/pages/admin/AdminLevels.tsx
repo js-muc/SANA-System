@@ -39,7 +39,7 @@ const PATHWAY_META: Record<string, { icon: React.ElementType; color: string; bg:
     border: 'border-amber-200',
     accent: 'bg-amber-500',
   },
-  'Sports & Career': {
+  'Arts & Sports': {
     icon: Trophy,
     color: 'text-emerald-700',
     bg: 'bg-emerald-50',
