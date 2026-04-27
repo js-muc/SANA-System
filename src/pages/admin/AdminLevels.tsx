@@ -122,6 +122,11 @@ console.log("LEVELS ERROR:", levelsRes.error);
     setError('');
     setSuccess('');
 
+    // ✅ ADD THIS BLOCK HERE
+  const { data: userData } = await supabase.auth.getUser();
+  console.log("CURRENT USER:", userData);
+  console.log("SCHOOL ID:", schoolId);
+
     const currentForLevel = levelSubjects.filter(ls => ls.level_id === selectedLevelId);
     const currentIds = new Set(currentForLevel.map(ls => ls.subject_id));
     const toDelete = currentForLevel.filter(ls => !selectedSubjectIds.has(ls.subject_id)).map(ls => ls.id);
