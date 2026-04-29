@@ -66,8 +66,8 @@ export default function AdminResults() {
     setClasses(classesRes.data ?? []);
     setSubjects(subjectsRes.data ?? []);
     setLevels(levelsRes.data ?? []);
-    setLoading(false);
     setStudents(studentsRes.data ?? []);
+    setLoading(false);
   }
 
   const classMap = useMemo(() => new Map(classes.map(c => [c.id, c])), [classes]);
