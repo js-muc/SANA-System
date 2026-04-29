@@ -45,7 +45,6 @@ function SuperAdminRoute({ children }: { children: React.ReactNode }) {
 
 function ProtectedRoutes() {
   const { user, profile, loading } = useAuth();
-  console.log("PROTECTED ROUTE:", { user, profile, loading });
 
 if (loading || !profile) {
   return (
