@@ -20,8 +20,8 @@ import SuperAdminDashboard from './pages/superadmin/SuperAdminDashboard';
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const { profile, loading } = useAuth();
 
-  
-  if (loading || !profile) {
+  // Step 1: wait ONLY for loading
+  if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <p className="text-sm text-gray-400">Loading admin...</p>
@@ -29,6 +29,12 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
+  // Step 2: if profile still missing, DO NOT BLOCK
+  if (!profile) {
+    return <div className="p-6 text-gray-400">Preparing profile...</div>;
+  }
+
+  // Step 3: role check
   if (profile.role !== 'admin' && profile.role !== 'super_admin') {
     return <Navigate to="/" replace />;
   }
