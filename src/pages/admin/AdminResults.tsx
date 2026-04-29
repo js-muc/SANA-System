@@ -15,6 +15,8 @@ type EnrichedScore = Score & {
   teacher?: Profile;
 };
 
+console.log("AdminResults mounted");
+
 export default function AdminResults() {
   console.log("ADMIN RESULTS COMPONENT MOUNTED 🔥");
   const { user, profile } = useAuth();
@@ -52,70 +54,91 @@ export default function AdminResults() {
 }, [user, profile]);
   
 
-  async function load() {
+async function load() {
   console.log("LOAD FUNCTION STARTED 🚀");
 
-  const schoolId = profile!.school_id;   // ✅ MOVE HERE (before Promise.all)
+  try {
+    const schoolId = profile?.school_id;
 
-  const results = await Promise.all([
-    supabase
-      .from('scores')
-      .select('*, subject:subjects(*), student:students(id, name, class_id)')
-      .eq('school_id', schoolId)
-      .order('created_at', { ascending: false }),
+    if (!schoolId) {
+      console.log("❌ No schoolId — skipping fetch");
+      return;
+    }
 
-    supabase
-      .from('profiles')
-      .select('*')
-      .eq('role', 'teacher')
-      .eq('school_id', schoolId)
-      .order('name'),
+    console.log("✅ Using schoolId:", schoolId);
 
-    supabase
-      .from('classes')
-      .select('*, level:levels(*)')
-      .eq('school_id', schoolId)
-      .order('name'),
+    const results = await Promise.all([
+      supabase
+        .from('scores')
+        .select('*, subject:subjects(*), student:students(id, name, class_id)')
+        .eq('school_id', schoolId)
+        .order('created_at', { ascending: false }),
 
-    supabase
-      .from('subjects')
-      .select('*')
-      .eq('school_id', schoolId)
-      .order('name'),
+      supabase
+        .from('profiles')
+        .select('*')
+        .eq('role', 'teacher')
+        .eq('school_id', schoolId)
+        .order('name'),
 
-    supabase
-      .from('levels')
-      .select('*')
-      .eq('school_id', schoolId)
-      .order('sort_order'),
+      supabase
+        .from('classes')
+        .select('*, level:levels(*)')
+        .eq('school_id', schoolId)
+        .order('name'),
 
-    supabase
-      .from('students')
-      .select('*')
-      .eq('school_id', schoolId)
-      .order('name'),
-  ]);
+      supabase
+        .from('subjects')
+        .select('*')
+        .eq('school_id', schoolId)
+        .order('name'),
 
-  console.log("DEBUG RESULTS:", results);
+      supabase
+        .from('levels')
+        .select('*')
+        .eq('school_id', schoolId)
+        .order('sort_order'),
 
-  const [scoresRes, teachersRes, classesRes, subjectsRes, levelsRes, studentsRes] = results;
+      supabase
+        .from('students')
+        .select('*')
+        .eq('school_id', schoolId)
+        .order('name'),
+    ]);
 
-  const teacherMap = new Map((teachersRes.data ?? []).map(t => [t.id, t]));
+    console.log("📦 RAW RESULTS:", results);
 
-  const enriched = (scoresRes.data ?? []).map(s => ({
-    ...s,
-    teacher: teacherMap.get(s.teacher_id),
-  }));
+    const [scoresRes, teachersRes, classesRes, subjectsRes, levelsRes, studentsRes] = results;
 
-  setScores(enriched);
-  setTeachers(teachersRes.data ?? []);
-  setClasses(classesRes.data ?? []);
-  setSubjects(subjectsRes.data ?? []);
-  setLevels(levelsRes.data ?? []);
-  setStudents(studentsRes.data ?? []);
-  setLoading(false);
+    if (scoresRes.error) throw scoresRes.error;
+    if (teachersRes.error) throw teachersRes.error;
+    if (classesRes.error) throw classesRes.error;
+    if (subjectsRes.error) throw subjectsRes.error;
+    if (levelsRes.error) throw levelsRes.error;
+    if (studentsRes.error) throw studentsRes.error;
+
+    const teacherMap = new Map((teachersRes.data ?? []).map(t => [t.id, t]));
+
+    const enriched = (scoresRes.data ?? []).map(s => ({
+      ...s,
+      teacher: teacherMap.get(s.teacher_id),
+    }));
+
+    setScores(enriched);
+    setTeachers(teachersRes.data ?? []);
+    setClasses(classesRes.data ?? []);
+    setSubjects(subjectsRes.data ?? []);
+    setLevels(levelsRes.data ?? []);
+    setStudents(studentsRes.data ?? []);
+
+    console.log("✅ DATA SET SUCCESSFULLY");
+
+  } catch (err) {
+    console.error("💥 LOAD CRASH:", err);
+  } finally {
+    setLoading(false);
+  }
 }
-
   const classMap = useMemo(() => new Map(classes.map(c => [c.id, c])), [classes]);
   const levelMap = useMemo(() => new Map(levels.map(l => [l.id, l])), [levels]);
 
