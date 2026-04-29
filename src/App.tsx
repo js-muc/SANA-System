@@ -19,10 +19,20 @@ import SuperAdminDashboard from './pages/superadmin/SuperAdminDashboard';
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const { profile, loading } = useAuth();
-  if (loading) return null;
-  if (profile && profile.role !== 'admin' && profile.role !== 'super_admin') {
+
+  
+  if (loading || !profile) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <p className="text-sm text-gray-400">Loading admin...</p>
+      </div>
+    );
+  }
+
+  if (profile.role !== 'admin' && profile.role !== 'super_admin') {
     return <Navigate to="/" replace />;
   }
+
   return <>{children}</>;
 }
 
