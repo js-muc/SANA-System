@@ -41,7 +41,25 @@ export default function AdminResults() {
   useEffect(() => { load(); }, [schoolId]);
 
   async function load() {
-    const [scoresRes, teachersRes, classesRes, subjectsRes, levelsRes, studentsRes] = await Promise.all([
+    const results = await Promise.all([
+  supabase
+    .from('scores')
+    .select('*, subject:subjects(*), student:students(id, name, class_id)')
+    .eq('school_id', schoolId!)
+    .order('created_at', { ascending: false }),
+
+  supabase.from('profiles').select('*').eq('role', 'teacher').eq('school_id', schoolId!).order('name'),
+
+  supabase.from('classes').select('*, level:levels(*)').eq('school_id', schoolId!).order('name'),
+
+  supabase.from('subjects').select('*').eq('school_id', schoolId!).order('name'),
+
+  supabase.from('levels').select('*').eq('school_id', schoolId!).order('sort_order'),
+
+  supabase.from('students').select('*').eq('school_id', schoolId!).order('name')
+]);
+
+console.log("DEBUG RESULTS:", results);
       supabase
         .from('scores')
         .select('*, subject:subjects(*), student:students(id, name, class_id)')
