@@ -59,7 +59,8 @@ export default function AdminResults() {
   supabase.from('students').select('*').eq('school_id', schoolId!).order('name')
 ]);
 
-console.log("DEBUG RESULTS:", results);
+ console.log("DEBUG RESULTS:", results);
+ const [scoresRes, teachersRes, classesRes, subjectsRes, levelsRes, studentsRes] = results; 
       
 
     const teacherMap = new Map((teachersRes.data ?? []).map(t => [t.id, t]));
