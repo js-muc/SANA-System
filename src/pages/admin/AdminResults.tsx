@@ -24,6 +24,9 @@ export default function AdminResults() {
   const [classes, setClasses] = useState<Class[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [levels, setLevels] = useState<Level[]>([]);
+
+  const [students, setStudents] = useState<any[]>([]);
+  
   const [loading, setLoading] = useState(true);
 
   const [search, setSearch] = useState('');
@@ -34,10 +37,12 @@ export default function AdminResults() {
   const [filterTerm, setFilterTerm] = useState('all');
   const [activeTab, setActiveTab] = useState<'table' | 'chart'>('table');
 
+  console.log("STUDENTS:", students);
+
   useEffect(() => { load(); }, [schoolId]);
 
   async function load() {
-    const [scoresRes, teachersRes, classesRes, subjectsRes, levelsRes] = await Promise.all([
+    const [scoresRes, teachersRes, classesRes, subjectsRes, levelsRes, studentsRes] = await Promise.all([
       supabase
         .from('scores')
         .select('*, subject:subjects(*), student:students(id, name, class_id)')
@@ -47,6 +52,7 @@ export default function AdminResults() {
       supabase.from('classes').select('*, level:levels(*)').eq('school_id', schoolId!).order('name'),
       supabase.from('subjects').select('*').eq('school_id', schoolId!).order('name'),
       supabase.from('levels').select('*').eq('school_id', schoolId!).order('sort_order'),
+      supabas.from('students').select('*') .eq('school_id', schoolId!).order('name')
     ]);
 
     const teacherMap = new Map((teachersRes.data ?? []).map(t => [t.id, t]));
@@ -61,6 +67,7 @@ export default function AdminResults() {
     setSubjects(subjectsRes.data ?? []);
     setLevels(levelsRes.data ?? []);
     setLoading(false);
+    setStudents(studentsRes.data ?? []);
   }
 
   const classMap = useMemo(() => new Map(classes.map(c => [c.id, c])), [classes]);
