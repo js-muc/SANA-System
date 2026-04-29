@@ -52,7 +52,7 @@ export default function AdminResults() {
       supabase.from('classes').select('*, level:levels(*)').eq('school_id', schoolId!).order('name'),
       supabase.from('subjects').select('*').eq('school_id', schoolId!).order('name'),
       supabase.from('levels').select('*').eq('school_id', schoolId!).order('sort_order'),
-      supabas.from('students').select('*') .eq('school_id', schoolId!).order('name')
+      supabase.from('students').select('*') .eq('school_id', schoolId!).order('name')
     ]);
 
     const teacherMap = new Map((teachersRes.data ?? []).map(t => [t.id, t]));
