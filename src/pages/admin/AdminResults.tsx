@@ -17,6 +17,7 @@ type EnrichedScore = Score & {
 
 export default function AdminResults() {
   const { user, profile } = useAuth();
+  console.log("AUTH STATE:", { user, profile });
   
 
   const [scores, setScores] = useState<EnrichedScore[]>([]);
