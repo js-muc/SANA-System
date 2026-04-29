@@ -38,7 +38,14 @@ export default function AdminResults() {
 
   console.log("STUDENTS:", students);
 
-  useEffect(() => { load(); }, [schoolId]);
+  useEffect(() => {
+  if (!schoolId) return;
+
+  console.log("SCHOOL ID READY:", schoolId);
+  load();
+}, [schoolId]);
+
+  console.log("LOAD WITH SCHOOL:", schoolId);
 
   async function load() {
      console.log("LOAD FUNCTION STARTED 🚀");
