@@ -28,7 +28,6 @@ export default function AdminResults() {
 
   const [students, setStudents] = useState<any[]>([]);
 
-  
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterTeacher, setFilterTeacher] = useState('all');
