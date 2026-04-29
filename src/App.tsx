@@ -52,23 +52,34 @@ function SuperAdminRoute({ children }: { children: React.ReactNode }) {
 function ProtectedRoutes() {
   const { user, profile, loading } = useAuth();
 
-if (loading || !profile) {
-  return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-      <div className="flex flex-col items-center gap-3">
-        <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-        <p className="text-sm text-slate-400">Loading session...</p>
+  // Step 1: wait for auth loading ONLY
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-slate-400">Loading SANA OS...</p>
+        </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
-if (!user) {
-  return <Navigate to="/login" replace />;
-}
-  // Admin accounts that are not yet approved get a holding screen
+  // Step 2: if no user → login
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // Step 3: if profile still loading → DON'T BLOCK
+  if (!profile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-gray-400">
+        Preparing profile...
+      </div>
+    );
+  }
+
+  // Step 4: approval check
   if (
-    profile &&
     profile.role === 'admin' &&
     (profile.approval_status === 'pending' || profile.approval_status === 'rejected')
   ) {
@@ -86,14 +97,12 @@ if (!user) {
         <Route path="/progress" element={<StudentProgress />} />
         <Route path="/merit-list" element={<MeritList />} />
 
-        {/* Admin-only */}
         <Route path="/admin/results" element={<AdminRoute><AdminResults /></AdminRoute>} />
         <Route path="/admin/teachers" element={<AdminRoute><AdminTeachers /></AdminRoute>} />
         <Route path="/admin/subjects" element={<AdminRoute><AdminSubjects /></AdminRoute>} />
         <Route path="/admin/levels" element={<AdminRoute><AdminLevels /></AdminRoute>} />
         <Route path="/admin/classes" element={<AdminRoute><AdminClasses /></AdminRoute>} />
 
-        {/* Super-admin-only */}
         <Route path="/superadmin" element={<SuperAdminRoute><SuperAdminDashboard /></SuperAdminRoute>} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
@@ -101,7 +110,6 @@ if (!user) {
     </Layout>
   );
 }
-
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) return null;
