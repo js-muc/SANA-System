@@ -39,18 +39,15 @@ export default function AdminResults() {
 
   console.log("STUDENTS:", students);
 
-  useEffect(() => {
-  if (!user || !profile || !profile.school_id) return;
+useEffect(() => {
+  if (!profile?.school_id) {
+    console.log("⏳ Waiting for profile...");
+    return;
+  }
 
-  console.log("AUTH READY ✅", {
-    user,
-    profile,
-    schoolId: profile.school_id,
-  });
-
+  console.log("AUTH READY ✅", profile.school_id);
   load();
-}, [user, profile]);
-  
+}, [profile?.school_id]);
 
 async function load() {
   console.log("LOAD FUNCTION STARTED 🚀");
