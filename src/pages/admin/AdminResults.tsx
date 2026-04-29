@@ -15,8 +15,6 @@ type EnrichedScore = Score & {
   teacher?: Profile;
 };
 
-console.log("AdminResults mounted");
-
 export default function AdminResults() {
   console.log("ADMIN RESULTS COMPONENT MOUNTED 🔥");
   const { user, profile } = useAuth();
