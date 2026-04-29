@@ -41,6 +41,7 @@ export default function AdminResults() {
   useEffect(() => { load(); }, [schoolId]);
 
   async function load() {
+     console.log("LOAD FUNCTION STARTED 🚀");
     const results = await Promise.all([
   supabase
     .from('scores')
