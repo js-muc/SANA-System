@@ -39,18 +39,18 @@ export default function AdminResults() {
 
   console.log("STUDENTS:", students);
 
-  useEffect(() => {
-  if (!user || !profile || !profile.school_id) return;
+useEffect(() => {
+  console.log("AUTH STATE CHECK:", { user, profile });
 
-  console.log("AUTH READY ✅", {
-    user,
-    profile,
-    schoolId: profile.school_id,
-  });
+  if (!profile?.school_id) {
+    console.log("⏳ Waiting for profile...");
+    return;
+  }
+
+  console.log("PROFILE READY — LOADING DATA");
 
   load();
-}, [user, profile]);
-  
+}, [profile?.school_id]);
 
 async function load() {
   console.log("LOAD FUNCTION STARTED 🚀");
@@ -196,6 +196,7 @@ async function load() {
   }
 
   if (loading) {
+    console.log("⏳ STILL LOADING UI...");
     return (
       <div className="flex items-center justify-center h-64">
         <div className="w-7 h-7 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
