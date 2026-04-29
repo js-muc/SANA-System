@@ -16,8 +16,8 @@ type EnrichedScore = Score & {
 };
 
 export default function AdminResults() {
-  const { profile } = useAuth();
-  const schoolId = profile?.school_id;
+  const { user, profile } = useAuth();
+  
 
   const [scores, setScores] = useState<EnrichedScore[]>([]);
   const [teachers, setTeachers] = useState<Profile[]>([]);
@@ -39,17 +39,22 @@ export default function AdminResults() {
   console.log("STUDENTS:", students);
 
   useEffect(() => {
-  if (!schoolId) return;
+  if (!user || !profile || !profile.school_id) return;
 
-  console.log("SCHOOL ID READY:", schoolId);
+  console.log("AUTH READY ✅", {
+    user,
+    profile,
+    schoolId: profile.school_id,
+  });
+
   load();
-}, [schoolId]);
-
-  console.log("LOAD WITH SCHOOL:", schoolId);
+}, [user, profile]);
+  
 
   async function load() {
      console.log("LOAD FUNCTION STARTED 🚀");
-    const results = await Promise.all([
+     const results = await Promise.all([
+     const schoolId = profile!.school_id;
   supabase
     .from('scores')
     .select('*, subject:subjects(*), student:students(id, name, class_id)')
