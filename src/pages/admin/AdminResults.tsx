@@ -52,44 +52,68 @@ export default function AdminResults() {
   
 
   async function load() {
-     console.log("LOAD FUNCTION STARTED 🚀");
-     const results = await Promise.all([
-     const schoolId = profile!.school_id;
-  supabase
-    .from('scores')
-    .select('*, subject:subjects(*), student:students(id, name, class_id)')
-    .eq('school_id', schoolId!)
-    .order('created_at', { ascending: false }),
+  console.log("LOAD FUNCTION STARTED 🚀");
 
-  supabase.from('profiles').select('*').eq('role', 'teacher').eq('school_id', schoolId!).order('name'),
+  const schoolId = profile!.school_id;   // ✅ MOVE HERE (before Promise.all)
 
-  supabase.from('classes').select('*, level:levels(*)').eq('school_id', schoolId!).order('name'),
+  const results = await Promise.all([
+    supabase
+      .from('scores')
+      .select('*, subject:subjects(*), student:students(id, name, class_id)')
+      .eq('school_id', schoolId)
+      .order('created_at', { ascending: false }),
 
-  supabase.from('subjects').select('*').eq('school_id', schoolId!).order('name'),
+    supabase
+      .from('profiles')
+      .select('*')
+      .eq('role', 'teacher')
+      .eq('school_id', schoolId)
+      .order('name'),
 
-  supabase.from('levels').select('*').eq('school_id', schoolId!).order('sort_order'),
+    supabase
+      .from('classes')
+      .select('*, level:levels(*)')
+      .eq('school_id', schoolId)
+      .order('name'),
 
-  supabase.from('students').select('*').eq('school_id', schoolId!).order('name')
-]);
+    supabase
+      .from('subjects')
+      .select('*')
+      .eq('school_id', schoolId)
+      .order('name'),
 
- console.log("DEBUG RESULTS:", results);
- const [scoresRes, teachersRes, classesRes, subjectsRes, levelsRes, studentsRes] = results; 
-      
+    supabase
+      .from('levels')
+      .select('*')
+      .eq('school_id', schoolId)
+      .order('sort_order'),
 
-    const teacherMap = new Map((teachersRes.data ?? []).map(t => [t.id, t]));
-    const enriched: EnrichedScore[] = (scoresRes.data ?? []).map(s => ({
-      ...s,
-      teacher: teacherMap.get(s.teacher_id),
-    }));
+    supabase
+      .from('students')
+      .select('*')
+      .eq('school_id', schoolId)
+      .order('name'),
+  ]);
 
-    setScores(enriched);
-    setTeachers(teachersRes.data ?? []);
-    setClasses(classesRes.data ?? []);
-    setSubjects(subjectsRes.data ?? []);
-    setLevels(levelsRes.data ?? []);
-    setStudents(studentsRes.data ?? []);
-    setLoading(false);
-  }
+  console.log("DEBUG RESULTS:", results);
+
+  const [scoresRes, teachersRes, classesRes, subjectsRes, levelsRes, studentsRes] = results;
+
+  const teacherMap = new Map((teachersRes.data ?? []).map(t => [t.id, t]));
+
+  const enriched = (scoresRes.data ?? []).map(s => ({
+    ...s,
+    teacher: teacherMap.get(s.teacher_id),
+  }));
+
+  setScores(enriched);
+  setTeachers(teachersRes.data ?? []);
+  setClasses(classesRes.data ?? []);
+  setSubjects(subjectsRes.data ?? []);
+  setLevels(levelsRes.data ?? []);
+  setStudents(studentsRes.data ?? []);
+  setLoading(false);
+}
 
   const classMap = useMemo(() => new Map(classes.map(c => [c.id, c])), [classes]);
   const levelMap = useMemo(() => new Map(levels.map(l => [l.id, l])), [levels]);
