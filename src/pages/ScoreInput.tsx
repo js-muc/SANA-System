@@ -207,6 +207,7 @@ export default function ScoreInput() {
       term: string;
       teacher_id: string;
       school_id: string | null;
+      assessment: string;
     }[] = [];
 
     for (const row of rows) {
@@ -221,6 +222,7 @@ export default function ScoreInput() {
             term: selectedTerm,
             teacher_id: user!.id,
             school_id: schoolId,
+            assessment: 'assessment 1',
           });
         }
       }
@@ -234,7 +236,7 @@ export default function ScoreInput() {
 
     const { error: err } = await supabase
       .from('scores')
-      .upsert(toUpsert, { onConflict: 'student_id,subject_id,term' });
+      .upsert(toUpsert, { onConflict: 'student_id,subject_id,term,assessment' });
 
     if (err) {
       setSaveError(err.message);

@@ -45,3 +45,21 @@ An OpenAI API key (for the AI comment feature)
     npm install
 
 2.3 Create the .env file
+
+The project reads three VITE_* variables at build/dev time (see src/lib/supabase.ts, src/lib/aiClient.ts). Create a .env file in the project root:
+
+VITE_SUPABASE_URL=https://<your-project-ref>.supabase.co
+VITE_SUPABASE_ANON_KEY=<your-project-anon-key>
+VITE_OPENAI_API_KEY=<unused-for-now-see-note-below>
+
+2.4 Link the CLI and run the migrations
+
+supabase login
+supabase link --project-ref <your-project-ref>
+supabase db push
+
+
+
+
+
+

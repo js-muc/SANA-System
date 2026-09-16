@@ -1,6 +1,12 @@
 // ai-insights — Optimized for scale (OpenAI + caching + fallback)
 
-import OpenAI from "npm:openai";
+//import OpenAI from "npm:openai";
+
+
+// ai-insights — Optimized for scale (Gemini + caching + fallback)
+const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+const GEMINI_MODEL = "gemini-flash-latest"; // alias that always points to the latest stable Flash model
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 // ── Config ─────────────────────────────────────────
 
@@ -10,9 +16,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const openai = new OpenAI({
+/*const openai = new OpenAI({
   apiKey: Deno.env.get("OPENAI_API_KEY"),
-});
+});*/
 
 // ── Simple in-memory cache (fast + cheap) ───────────
 
@@ -131,7 +137,7 @@ State: improving, stable, or declining.`;
 
 // ── OpenAI call (CHEAP MODEL) ──────────────────────
 
-async function generateAI(prompt: string): Promise<string> {
+/*async function generateAI(prompt: string): Promise<string> {
   const response = await openai.responses.create({
     model: "gpt-4o-mini",
     input: prompt,
@@ -139,9 +145,42 @@ async function generateAI(prompt: string): Promise<string> {
   });
 
   return response.output[0].content[0].text.trim();
-}
+}*/
 
 // ── Handler ────────────────────────────────────────
+
+// ── Gemini call (CHEAP MODEL) ───────────────────────
+
+async function generateAI(prompt: string): Promise<string> {
+  const res = await fetch(GEMINI_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": GEMINI_API_KEY ?? "",
+    },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { maxOutputTokens: 150 },
+    }),
+  });
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    throw new Error(`Gemini API error (${res.status}): ${errBody}`);
+  }
+
+  const data = await res.json();
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+  if (!text) {
+    throw new Error("Gemini returned no text in response");
+  }
+
+  return text.trim();
+}
+
+
+
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -149,11 +188,23 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const apiKey = Deno.env.get("OPENAI_API_KEY");
+    /*const apiKey = Deno.env.get("OPENAI_API_KEY");
     if (!apiKey) {
       return new Response(
         JSON.stringify({
           error: "Missing OPENAI_API_KEY in Supabase secrets.",
+        }),
+        { status: 503, headers: corsHeaders }
+      );
+    }*/
+   // find this block near the top of the handler and change it:
+
+   
+    const apiKey = Deno.env.get("GEMINI_API_KEY");
+    if (!apiKey) {
+      return new Response(
+        JSON.stringify({
+          error: "Missing GEMINI_API_KEY in Supabase secrets.",
         }),
         { status: 503, headers: corsHeaders }
       );
