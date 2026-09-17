@@ -61,14 +61,15 @@ tr:nth-child(even) td { background:#fafafa; }
 
 export default function Reports() {
   const { user, profile, school } = useAuth();
-
   const [students, setStudents] = useState<Student[]>([]);
   const [scores, setScores] = useState<Score[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTerm, setSelectedTerm] = useState('Term 1');
   const [selectedYear, setSelectedYear] = useState(CURRENT_YEAR);
+  const [selectedAssessment, setSelectedAssessment] = useState('Assessment 1');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+
 
   useEffect(() => {
     if (!user) return;
@@ -91,13 +92,23 @@ export default function Reports() {
     load();
   }, [user]);
 
-  const reports = useMemo(() =>
+  /*const reports = useMemo(() =>
     students.map(s => {
       const termScores = scores.filter(sc => sc.term === selectedTerm);
       const risk = analyzeStudent(s.id, termScores);
       return generateReportCard(s, risk, selectedTerm, selectedYear);
     }),
     [students, scores, selectedTerm, selectedYear],
+  );*/
+    const reports = useMemo(() =>
+    students.map(s => {
+      const termScores = scores.filter(
+        sc => sc.term === selectedTerm && sc.year === selectedYear && sc.assessment === selectedAssessment
+      );
+      const risk = analyzeStudent(s.id, termScores);
+      return generateReportCard(s, risk, selectedTerm, selectedYear);
+    }),
+    [students, scores, selectedTerm, selectedYear, selectedAssessment],
   );
 
   const filteredReports = useMemo(() =>
@@ -259,6 +270,15 @@ export default function Reports() {
           >
             {TERMS.map(t => <option key={t}>{t}</option>)}
           </select>
+          <select
+              value={selectedAssessment}
+              onChange={e => setSelectedAssessment(e.target.value)}
+              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {Array.from(new Set(scores.map(sc => sc.assessment))).sort().map(name => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+            </select>
           <select
             value={selectedYear}
             onChange={e => setSelectedYear(e.target.value)}

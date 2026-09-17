@@ -74,6 +74,8 @@ export type Score = {
   subject_id: string;
   score: number;
   term: string;
+  year: string;
+  assessment: string;
   teacher_id: string;
   school_id: string;
   created_at: string;

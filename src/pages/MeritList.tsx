@@ -70,6 +70,7 @@ export default function MeritList() {
   const [selectedClassId, setSelectedClassId] = useState('');
   const [selectedTerm, setSelectedTerm] = useState('Term 1');
   const [selectedYear, setSelectedYear] = useState(CURRENT_YEAR);
+  const [selectedAssessment, setSelectedAssessment] = useState('Assessment 1');
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<StudentRow[]>([]);
@@ -135,7 +136,9 @@ export default function MeritList() {
       .from('scores')
       .select('student_id, subject_id, score')
       .in('student_id', studentList.map(s => s.id))
-      .eq('term', selectedTerm);
+      .eq('term', selectedTerm)
+      .eq('year', selectedYear)
+      .eq('assessment', selectedAssessment);
 
     const scoreMap: Record<string, Record<string, number>> = {};
     for (const sc of scoresData ?? []) {
@@ -175,7 +178,7 @@ export default function MeritList() {
     setSubjects(subjectList);
     setRows(withPositions);
     setLoading(false);
-  }, [selectedClassId, selectedTerm, classes, user, isAdmin]);
+  }, [selectedClassId, selectedTerm, selectedYear, selectedAssessment, classes, user, isAdmin]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -386,7 +389,18 @@ export default function MeritList() {
               })}
             </select>
           </div>
-
+          <div className="min-w-40">
+            <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-1.5">Assessment</label>
+            <select
+              value={selectedAssessment}
+              onChange={e => setSelectedAssessment(e.target.value)}
+              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="Assessment 1">Assessment 1</option>
+              <option value="Assessment 2">Assessment 2</option>
+            </select>
+          </div>
+          
           {hasData && (
             <div className="flex items-center gap-2">
               <button

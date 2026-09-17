@@ -20,6 +20,7 @@ import type { Student, Subject, Class } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
 const TERMS = ['Term 1', 'Term 2', 'Term 3'];
+const CURRENT_YEAR = new Date().getFullYear().toString();
 
 type ScoreRow = {
   studentId: string;
@@ -39,11 +40,17 @@ export default function ScoreInput() {
   const schoolId = profile?.school_id ?? null;
   const isAdmin = profile?.role === 'admin';
 
-  // Class / term selection
+  // Class / term / year / assessment selection
   const [classes, setClasses] = useState<Class[]>([]);
   const [selectedClassId, setSelectedClassId] = useState('');
   const [selectedClass, setSelectedClass] = useState<Class | null>(null);
   const [selectedTerm, setSelectedTerm] = useState('Term 1');
+  const [selectedYear, setSelectedYear] = useState(CURRENT_YEAR);
+  const [assessmentName, setAssessmentName] = useState('Assessment 1');
+  const [assessmentOptions, setAssessmentOptions] = useState<string[]>([]);
+
+
+
 
   // Curriculum
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -116,11 +123,15 @@ export default function ScoreInput() {
     loadClassStructure(selectedClassId, cls?.level_id ?? null);
   }, [selectedClassId, classes, user]);
 
-  // ── Load saved scores when class or term changes ──────────────────────────
+    // ── Load saved scores + assessment names when class/term/year/assessment changes ──
   useEffect(() => {
     if (!selectedClassId || students.length === 0) return;
-    loadSavedScores(students.map(s => s.id), selectedTerm);
-  }, [selectedClassId, selectedTerm, students]);
+    const studentIds = students.map(s => s.id);
+    loadSavedScores(studentIds, selectedTerm, selectedYear, assessmentName);
+    loadAssessmentOptions(studentIds, selectedTerm, selectedYear);
+  }, [selectedClassId, selectedTerm, selectedYear, assessmentName, students]);
+
+  
 
   async function loadClassStructure(classId: string, levelId: string | null) {
     setSubjectsLoading(true);
@@ -154,17 +165,18 @@ export default function ScoreInput() {
     setSavedScores({});
     setSubjectsLoading(false);
   }
-
-  async function loadSavedScores(studentIds: string[], term: string) {
+  // load saved scores for the current class+term+year+assessment and populate the rows
+      async function loadSavedScores(studentIds: string[], term: string, year: string, assessment: string) {
     if (studentIds.length === 0) return;
 
     const { data } = await supabase
       .from('scores')
       .select('student_id, subject_id, score')
       .in('student_id', studentIds)
-      .eq('term', term);
+      .eq('term', term)
+      .eq('year', year)
+      .eq('assessment', assessment);
 
-    // Build map: studentId → subjectId → score
     const map: Record<string, Record<string, number>> = {};
     for (const s of data ?? []) {
       if (!map[s.student_id]) map[s.student_id] = {};
@@ -172,7 +184,6 @@ export default function ScoreInput() {
     }
     setSavedScores(map);
 
-    // Pre-fill rows with saved scores (as string values for the inputs)
     setRows(prev =>
       prev.map(row => ({
         ...row,
@@ -181,9 +192,25 @@ export default function ScoreInput() {
         ),
       }))
     );
-    // Clear any stale highlighting
     setHighlightMissing(false);
   }
+
+  // auto-load assessment options for the current class+term+year and populate the dropdown
+    async function loadAssessmentOptions(studentIds: string[], term: string, year: string) {
+    if (studentIds.length === 0) return;
+
+    const { data } = await supabase
+      .from('scores')
+      .select('assessment')
+      .in('student_id', studentIds)
+      .eq('term', term)
+      .eq('year', year);
+
+    const names = Array.from(new Set((data ?? []).map(d => d.assessment))).sort();
+    setAssessmentOptions(names);
+  }
+
+
 
   // ── Score input handler ───────────────────────────────────────────────────
   function setScore(studentId: string, subjectId: string, value: string) {
@@ -205,9 +232,10 @@ export default function ScoreInput() {
       subject_id: string;
       score: number;
       term: string;
+      year: string;
+      assessment: string;
       teacher_id: string;
       school_id: string | null;
-      assessment: string;
     }[] = [];
 
     for (const row of rows) {
@@ -220,9 +248,10 @@ export default function ScoreInput() {
             subject_id: sub.id,
             score: num,
             term: selectedTerm,
+            year: selectedYear,
+            assessment: assessmentName.trim() || 'Assessment 1',
             teacher_id: user!.id,
             school_id: schoolId,
-            assessment: 'assessment 1',
           });
         }
       }
@@ -236,7 +265,7 @@ export default function ScoreInput() {
 
     const { error: err } = await supabase
       .from('scores')
-      .upsert(toUpsert, { onConflict: 'student_id,subject_id,term,assessment' });
+      .upsert(toUpsert, { onConflict: 'student_id,subject_id,term,year,assessment' });
 
     if (err) {
       setSaveError(err.message);
@@ -422,6 +451,44 @@ export default function ScoreInput() {
               {TERMS.map(t => <option key={t}>{t}</option>)}
             </select>
           </div>
+
+                    <div className="flex-1 min-w-32">
+            <label className="block text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wide">Year</label>
+            <select
+              value={selectedYear}
+              onChange={e => {
+                setSelectedYear(e.target.value);
+                setSaveError('');
+                setSaveSuccess(false);
+              }}
+              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {[-1, 0, 1].map(offset => {
+                const y = (parseInt(CURRENT_YEAR) + offset).toString();
+                return <option key={y} value={y}>{y}</option>;
+              })}
+            </select>
+          </div>
+
+          <div className="flex-1 min-w-48">
+            <label className="block text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wide">Assessment</label>
+            <input
+              list="assessment-options"
+              value={assessmentName}
+              onChange={e => {
+                setAssessmentName(e.target.value);
+                setSaveError('');
+                setSaveSuccess(false);
+              }}
+              placeholder="e.g. CAT 1, Midterm, Assessment 1"
+              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <datalist id="assessment-options">
+              {assessmentOptions.map(name => <option key={name} value={name} />)}
+            </datalist>
+          </div>
+
+
 
           {selectedClassId && (
             <button
