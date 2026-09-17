@@ -48,16 +48,27 @@ An OpenAI API key (for the AI comment feature)
 
 The project reads three VITE_* variables at build/dev time (see src/lib/supabase.ts, src/lib/aiClient.ts). Create a .env file in the project root:
 
-VITE_SUPABASE_URL=https://<your-project-ref>.supabase.co
-VITE_SUPABASE_ANON_KEY=<your-project-anon-key>
-VITE_OPENAI_API_KEY=<unused-for-now-see-note-below>
+    VITE_SUPABASE_URL=https://<your-project-ref>.supabase.co
+    VITE_SUPABASE_ANON_KEY=<your-project-anon-key>
+    VITE_OPENAI_API_KEY=<unused-for-now-see-note-below>
+
 
 2.4 Link the CLI and run the migrations
+    #login
+    supabase login
+    #get project ref from supabase
+    supabase link --project-ref <your-project-ref>
+    #check connection
+    supabase status
+    #latest migration push to remote supabase db
+    supabase db push
 
-supabase login
-supabase link --project-ref <your-project-ref>
-supabase db push
+supabase db push applies every file in supabase/migrations/ in filename order — this matters, since later migrations depend on tables/columns created earlier (e.g. school_id is added to several tables only after the multi-school migration runs). Don't run them out of order or skip any.
+ 
+    #query on terminal
+    $ supabase migration new create_new_query
 
+If you'd rather apply them by hand, open the Supabase dashboard's SQL Editor and run each file in supabase/migrations/ in the order they're listed (they're timestamp-prefixed, so alphabetical = chronological).
 
 
 
