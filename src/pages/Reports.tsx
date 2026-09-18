@@ -67,6 +67,7 @@ export default function Reports() {
   const [selectedTerm, setSelectedTerm] = useState('Term 1');
   const [selectedYear, setSelectedYear] = useState(CURRENT_YEAR);
   const [selectedAssessment, setSelectedAssessment] = useState('Assessment 1');
+  const [reportMode, setReportMode] = useState<'assessment' | 'summary'>('assessment');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
 
@@ -92,24 +93,28 @@ export default function Reports() {
     load();
   }, [user]);
 
-  /*const reports = useMemo(() =>
-    students.map(s => {
-      const termScores = scores.filter(sc => sc.term === selectedTerm);
-      const risk = analyzeStudent(s.id, termScores);
-      return generateReportCard(s, risk, selectedTerm, selectedYear);
-    }),
-    [students, scores, selectedTerm, selectedYear],
-  );*/
     const reports = useMemo(() =>
     students.map(s => {
-      const termScores = scores.filter(
-        sc => sc.term === selectedTerm && sc.year === selectedYear && sc.assessment === selectedAssessment
+      const termScores = scores.filter(sc =>
+        sc.term === selectedTerm &&
+        sc.year === selectedYear &&
+        (reportMode === 'summary' || sc.assessment === selectedAssessment)
       );
       const risk = analyzeStudent(s.id, termScores);
       return generateReportCard(s, risk, selectedTerm, selectedYear);
     }),
-    [students, scores, selectedTerm, selectedYear, selectedAssessment],
+    [students, scores, selectedTerm, selectedYear, selectedAssessment, reportMode],
   );
+
+  // Which assessments actually fed into this term's summary — shown on screen and in the printed header
+  const summaryAssessmentNames = useMemo(() => {
+    const names = new Set(
+      scores.filter(sc => sc.term === selectedTerm && sc.year === selectedYear).map(sc => sc.assessment)
+    );
+    return Array.from(names).sort();
+  }, [scores, selectedTerm, selectedYear]);
+
+    
 
   const filteredReports = useMemo(() =>
     reports.filter(r => r.student.name.toLowerCase().includes(search.toLowerCase())),
@@ -145,7 +150,7 @@ export default function Reports() {
 </head><body>
 <div class="page-header">
   <h1>${schoolName}</h1>
-  <h2>CBC Student Report Card — ${report.term} ${report.year}</h2>
+  <h2>CBC Student Report Card — ${report.term} ${report.year} — ${reportMode === 'summary' ? 'Term Summary' : selectedAssessment}</h2>
 </div>
 <div class="student-meta">
   <div class="meta-row"><span class="meta-label">School:</span><span class="meta-value">${schoolName}</span></div>
@@ -154,6 +159,10 @@ export default function Reports() {
   <div class="meta-row"><span class="meta-label">Grade / Class:</span><span class="meta-value">${className}</span></div>
   <div class="meta-row"><span class="meta-label">Term:</span><span class="meta-value">${report.term}</span></div>
   <div class="meta-row"><span class="meta-label">Year:</span><span class="meta-value">${report.year}</span></div>
+  ${reportMode === 'summary'
+    ? `<div class="meta-row"><span class="meta-label">Assessments Included:</span><span class="meta-value">${summaryAssessmentNames.join(', ')}</span></div>`
+    : `<div class="meta-row"><span class="meta-label">Assessment:</span><span class="meta-value">${selectedAssessment}</span></div>`
+  }
 </div>
 <div class="section-title">1. Learning Areas Assessment</div>
 <table>
@@ -270,15 +279,42 @@ export default function Reports() {
           >
             {TERMS.map(t => <option key={t}>{t}</option>)}
           </select>
-          <select
+                    <div className="flex rounded-xl border border-slate-200 overflow-hidden shrink-0">
+            <button
+              onClick={() => setReportMode('assessment')}
+              className={`px-3 py-2.5 text-sm font-semibold transition ${
+                reportMode === 'assessment' ? 'bg-blue-700 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              Per-Assessment
+            </button>
+            <button
+              onClick={() => setReportMode('summary')}
+              className={`px-3 py-2.5 text-sm font-semibold transition ${
+                reportMode === 'summary' ? 'bg-blue-700 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              Term Summary
+            </button>
+          </div>
+          {reportMode === 'assessment' && (
+            <select
               value={selectedAssessment}
               onChange={e => setSelectedAssessment(e.target.value)}
-              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               {Array.from(new Set(scores.map(sc => sc.assessment))).sort().map(name => (
                 <option key={name} value={name}>{name}</option>
               ))}
             </select>
+          )}
+        </div>
+        {reportMode === 'summary' && summaryAssessmentNames.length > 0 && (
+          <p className="mt-2 text-xs text-slate-500">
+            Term Summary averages: <span className="font-medium text-slate-700">{summaryAssessmentNames.join(', ')}</span>
+          </p>
+        )}
+        <div className="mt-3">
           <select
             value={selectedYear}
             onChange={e => setSelectedYear(e.target.value)}

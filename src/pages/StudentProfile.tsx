@@ -25,10 +25,13 @@ import {
 import { supabase } from '../lib/supabase';
 import type { Student, Score } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { analyzeStudent, getRiskColor, getCBCColor } from '../lib/riskEngine';
+import { analyzeStudent, getRiskColor, getCBCColor, getCBCSubLevel } from '../lib/riskEngine';
 import type { SubjectPerformance } from '../lib/riskEngine';
 
+
 const RISK_LABELS = { safe: 'Safe', 'at-risk': 'At Risk', critical: 'Critical' };
+const Terms =['Term 1', 'Term 2', 'Term 3'];
+const CURRENT_YEAR = new Date().getFullYear().toString();
 
 function TrendIcon({ trend }: { trend: SubjectPerformance['trend'] }) {
   if (trend === 'improving') return <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />;
@@ -45,6 +48,8 @@ export default function StudentProfile() {
   const [student, setStudent] = useState<Student | null>(null);
   const [scores, setScores] = useState<Score[]>([]);
   const [loading, setLoading] = useState(true);
+  const [historyTerm, setHistoryTerm] = useState('Term 1');
+  const [historyYear, setHistoryYear] = useState(CURRENT_YEAR);
 
   useEffect(() => {
     if (!user || !id) return;
@@ -73,6 +78,49 @@ export default function StudentProfile() {
       data: sp.scores.map((s, i) => ({ entry: `#${i + 1}`, score: s })),
     }));
   }, [risk]);
+
+    // Which years actually have data, for the Year selector's options
+  const availableYears = useMemo(() => {
+    const years = Array.from(new Set(scores.map(s => s.year))).sort();
+    return years.length > 0 ? years : [CURRENT_YEAR];
+  }, [scores]);
+
+  // Scores filtered down to just the term+year currently selected in Score History
+  const historyScores = useMemo(
+    () => scores.filter(s => s.term === historyTerm && s.year === historyYear),
+    [scores, historyTerm, historyYear],
+  );
+
+  // The distinct subjects and assessment names present in that filtered set —
+  // these become the pivot table's rows and columns
+  const historySubjects = useMemo(() => {
+    const map = new Map<string, string>(); // subjectId → subjectName
+    for (const s of historyScores) {
+      map.set(s.subject_id, (s as any).subject?.name ?? 'Unknown');
+    }
+    return Array.from(map.entries()); // [ [subjectId, subjectName], ... ]
+  }, [historyScores]);
+
+  const historyAssessments = useMemo(() => {
+    // Sort by the earliest created_at seen for each assessment name, so
+    // "CAT 1" appears before "CAT 2" in chronological order rather than
+    // alphabetically (which would coincidentally work for these two names,
+    // but not for e.g. "Opener" vs "End Term").
+    const firstSeen = new Map<string, string>(); // assessmentName → earliest created_at
+    for (const s of historyScores) {
+      const existing = firstSeen.get(s.assessment);
+      if (!existing || s.created_at < existing) {
+        firstSeen.set(s.assessment, s.created_at);
+      }
+    }
+    return Array.from(firstSeen.keys()).sort(
+      (a, b) => (firstSeen.get(a)! < firstSeen.get(b)! ? -1 : 1)
+    );
+  }, [historyScores]);
+
+  // Quick lookup: given a subjectId and an assessment name, find that cell's score
+  const historyCell = (subjectId: string, assessment: string) =>
+    historyScores.find(s => s.subject_id === subjectId && s.assessment === assessment);
 
   // Radar data
   const radarData = useMemo(() =>
@@ -257,49 +305,81 @@ export default function StudentProfile() {
         </div>
       )}
 
+
       {/* Score history */}
-      {scores.length > 0 && (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm mt-4 overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-100">
-            <h3 className="font-semibold text-sm text-slate-900">Score History</h3>
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm mt-4 overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
+          <h3 className="font-semibold text-sm text-slate-900">Score History</h3>
+          <div className="flex items-center gap-2">
+            <select
+              value={historyYear}
+              onChange={e => setHistoryYear(e.target.value)}
+              className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-medium bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+            <div className="flex rounded-lg border border-slate-200 overflow-hidden">
+              {Terms.map(t => (
+                <button
+                  key={t}
+                  onClick={() => setHistoryTerm(t)}
+                  className={`px-3 py-1.5 text-xs font-semibold transition ${
+                    historyTerm === t
+                      ? 'bg-blue-700 text-white'
+                      : 'bg-white text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
           </div>
+        </div>
+
+        {historySubjects.length === 0 || historyAssessments.length === 0 ? (
+          <div className="px-5 py-8 text-center text-sm text-slate-400">
+            No scores recorded for {historyTerm}, {historyYear}.
+          </div>
+        ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-slate-50">
                 <tr>
                   <th className="text-left px-5 py-3 font-semibold text-slate-600">Subject</th>
-                  <th className="text-left px-5 py-3 font-semibold text-slate-600">Score</th>
-                  <th className="text-left px-5 py-3 font-semibold text-slate-600">CBC Level</th>
-                  <th className="text-left px-5 py-3 font-semibold text-slate-600">Term</th>
-                  <th className="text-left px-5 py-3 font-semibold text-slate-600">Date</th>
+                  {historyAssessments.map(a => (
+                    <th key={a} className="text-center px-5 py-3 font-semibold text-slate-600">{a}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {scores.map(s => {
-                  const sp = risk.subjectPerformances.find(sp => sp.subjectId === s.subject_id);
-                  return (
-                    <tr key={s.id} className="hover:bg-slate-50/50">
-                      <td className="px-5 py-3 text-slate-900">{(s as any).subject?.name ?? '—'}</td>
-                      <td className="px-5 py-3 font-semibold text-slate-900">{s.score}%</td>
-                      <td className="px-5 py-3">
-                        {sp && (
-                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${getCBCColor(sp.cbcLevel)}`}>
-                            {sp.cbcLevel}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-5 py-3 text-slate-500">{s.term}</td>
-                      <td className="px-5 py-3 text-slate-400">
-                        {new Date(s.created_at).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })}
-                      </td>
-                    </tr>
-                  );
-                })}
+                {historySubjects.map(([subjectId, subjectName]) => (
+                  <tr key={subjectId} className="hover:bg-slate-50/50">
+                    <td className="px-5 py-3 text-slate-900 font-medium">{subjectName}</td>
+                    {historyAssessments.map(a => {
+                      const cell = historyCell(subjectId, a);
+                      return (
+                        <td key={a} className="px-5 py-3 text-center">
+                          {cell ? (
+                            <span>
+                              <span className="font-semibold text-slate-900">{cell.score}%</span>
+                              <span className="text-slate-400 text-xs ml-1">
+                                ({getCBCSubLevel(cell.score)})
+                              </span>
+                            </span>
+                          ) : (
+                            <span className="text-slate-300">—</span>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+        )}
+      </div>
+      
     </div>
   );
 }

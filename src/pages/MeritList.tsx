@@ -71,10 +71,13 @@ export default function MeritList() {
   const [selectedTerm, setSelectedTerm] = useState('Term 1');
   const [selectedYear, setSelectedYear] = useState(CURRENT_YEAR);
   const [selectedAssessment, setSelectedAssessment] = useState('Assessment 1');
+  const [reportMode, setReportMode] = useState<'assessment' | 'summary'>('assessment');
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<StudentRow[]>([]);
   const [showPrintTip, setShowPrintTip] = useState(false);
+  const [summaryAssessmentNames, setSummaryAssessmentNames] = useState<string[]>([]);
+  const [assessmentOptions, setAssessmentOptions] = useState<string[]>(['Assessment 1']);
   const [hasSeenPrintTip, setHasSeenPrintTip] = useState(false);
 
   // Load classes
@@ -92,6 +95,37 @@ export default function MeritList() {
     () => classes.find(c => c.id === selectedClassId) ?? null,
     [classes, selectedClassId],
   );
+    // Load the real list of assessment names used for this class/term/year, for the dropdown
+  useEffect(() => {
+    if (!selectedClassId || !user) return;
+
+    async function loadAssessmentOptions() {
+      const studentsQuery = supabase
+        .from('students')
+        .select('id')
+        .eq('class_id', selectedClassId);
+      if (!isAdmin) (studentsQuery as any).eq('teacher_id', user!.id);
+
+      const { data: studentRows } = await studentsQuery;
+      const studentIds = (studentRows ?? []).map(s => s.id);
+      if (studentIds.length === 0) {
+        setAssessmentOptions(['Assessment 1']);
+        return;
+      }
+
+      const { data: scoreRows } = await supabase
+        .from('scores')
+        .select('assessment')
+        .in('student_id', studentIds)
+        .eq('term', selectedTerm)
+        .eq('year', selectedYear);
+
+      const names = Array.from(new Set((scoreRows ?? []).map(s => s.assessment))).sort();
+      setAssessmentOptions(names.length > 0 ? names : ['Assessment 1']);
+    }
+
+    loadAssessmentOptions();
+  }, [selectedClassId, selectedTerm, selectedYear, user, isAdmin]);
 
   // ── Load merit list data ────────────────────────────────────────────────────
 
@@ -131,20 +165,47 @@ export default function MeritList() {
       return;
     }
 
-    // Load scores for this class + term
-    const { data: scoresData } = await supabase
+    
+        // Load scores for this class + term + year (+ assessment, only in per-assessment mode)
+    let scoresQuery = supabase
       .from('scores')
-      .select('student_id, subject_id, score')
+      .select('student_id, subject_id, score, assessment')
       .in('student_id', studentList.map(s => s.id))
       .eq('term', selectedTerm)
-      .eq('year', selectedYear)
-      .eq('assessment', selectedAssessment);
+      .eq('year', selectedYear);
 
-    const scoreMap: Record<string, Record<string, number>> = {};
-    for (const sc of scoresData ?? []) {
-      if (!scoreMap[sc.student_id]) scoreMap[sc.student_id] = {};
-      scoreMap[sc.student_id][sc.subject_id] = sc.score;
+    if (reportMode === 'assessment') {
+      scoresQuery = scoresQuery.eq('assessment', selectedAssessment);
     }
+
+    const { data: scoresData } = await scoresQuery;
+
+    // Group raw scores by student+subject first — in summary mode this can be
+    // SEVERAL rows per subject (one per assessment); in per-assessment mode
+    // it'll always be exactly one, since the query already filtered to one assessment.
+    const rawByStudentSubject: Record<string, Record<string, number[]>> = {};
+    for (const sc of scoresData ?? []) {
+      if (!rawByStudentSubject[sc.student_id]) rawByStudentSubject[sc.student_id] = {};
+      if (!rawByStudentSubject[sc.student_id][sc.subject_id]) {
+        rawByStudentSubject[sc.student_id][sc.subject_id] = [];
+      }
+      rawByStudentSubject[sc.student_id][sc.subject_id].push(sc.score);
+    }
+
+    // Collapse each subject's array down to a single number: the simple average.
+    // In per-assessment mode this is a no-op (averaging one number returns itself).
+    const scoreMap: Record<string, Record<string, number>> = {};
+    for (const studentId of Object.keys(rawByStudentSubject)) {
+      scoreMap[studentId] = {};
+      for (const subjectId of Object.keys(rawByStudentSubject[studentId])) {
+        const vals = rawByStudentSubject[studentId][subjectId];
+        scoreMap[studentId][subjectId] = Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10;
+      }
+    }
+
+    // Which assessments actually contributed this term — for the summary-mode label
+    const summaryNames = Array.from(new Set((scoresData ?? []).map(sc => sc.assessment))).sort();
+    setSummaryAssessmentNames(summaryNames);
 
     // Build rows with mean + sub-levels
     const built: Omit<StudentRow, 'position'>[] = studentList.map(student => {
@@ -178,7 +239,7 @@ export default function MeritList() {
     setSubjects(subjectList);
     setRows(withPositions);
     setLoading(false);
-  }, [selectedClassId, selectedTerm, selectedYear, selectedAssessment, classes, user, isAdmin]);
+    }, [selectedClassId, selectedTerm, selectedYear, selectedAssessment, reportMode, classes, user, isAdmin]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -240,12 +301,15 @@ export default function MeritList() {
 <title>Merit List — ${selectedClass?.name ?? ''} ${selectedTerm}</title>
 <style>${PRINT_CSS}</style>
 </head><body>
-<div class="report-title">CBC Class Performance List</div>
+<div class="report-title">Class Performance List</div>
 <div class="meta-grid">
   <div class="meta-item"><span class="meta-label">School:</span><span class="meta-value">${school?.name ?? ''}</span></div>
   <div class="meta-item"><span class="meta-label">Class:</span><span class="meta-value">${selectedClass?.name ?? ''}</span></div>
-  <div class="meta-item"><span class="meta-label">Term:</span><span class="meta-value">${selectedTerm}</span></div>
-  <div class="meta-item"><span class="meta-label">Year:</span><span class="meta-value">${selectedYear}</span></div>
+    <div class="meta-item"><span class="meta-label">Year:</span><span class="meta-value">${selectedYear}</span></div>
+  ${reportMode === 'summary'
+    ? `<div class="meta-item"><span class="meta-label">Assessments Included:</span><span class="meta-value">${summaryAssessmentNames.join(', ')}</span></div>`
+    : `<div class="meta-item"><span class="meta-label">Assessment:</span><span class="meta-value">${selectedAssessment}</span></div>`
+  }
 </div>
 <table>
   <thead>
@@ -389,17 +453,46 @@ export default function MeritList() {
               })}
             </select>
           </div>
-          <div className="min-w-40">
-            <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-1.5">Assessment</label>
-            <select
-              value={selectedAssessment}
-              onChange={e => setSelectedAssessment(e.target.value)}
-              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="Assessment 1">Assessment 1</option>
-              <option value="Assessment 2">Assessment 2</option>
-            </select>
+                    <div className="min-w-fit">
+            <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-1.5">Mode</label>
+            <div className="flex rounded-xl border border-slate-200 overflow-hidden">
+              <button
+                onClick={() => setReportMode('assessment')}
+                className={`px-3 py-2.5 text-sm font-semibold transition ${
+                  reportMode === 'assessment' ? 'bg-blue-700 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                Per-Assessment
+              </button>
+              <button
+                onClick={() => setReportMode('summary')}
+                className={`px-3 py-2.5 text-sm font-semibold transition ${
+                  reportMode === 'summary' ? 'bg-blue-700 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                Term Summary
+              </button>
+            </div>
           </div>
+
+          {reportMode === 'assessment' && (
+            <div className="min-w-40">
+              <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-1.5">Assessment</label>
+              <select
+                value={selectedAssessment}
+                onChange={e => setSelectedAssessment(e.target.value)}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {assessmentOptions.map(name => <option key={name} value={name}>{name}</option>)}
+              </select>
+            </div>
+          )}
+
+          {reportMode === 'summary' && summaryAssessmentNames.length > 0 && (
+            <p className="text-xs text-slate-500 self-end pb-2.5">
+              Averaging: <span className="font-medium text-slate-700">{summaryAssessmentNames.join(', ')}</span>
+            </p>
+          )}
           
           {hasData && (
             <div className="flex items-center gap-2">
