@@ -48,7 +48,13 @@ export default function ScoreInput() {
   const [selectedYear, setSelectedYear] = useState(CURRENT_YEAR);
   const [assessmentName, setAssessmentName] = useState('Assessment 1');
   const [assessmentOptions, setAssessmentOptions] = useState<string[]>([]);
-
+  const [showManageAssessments, setShowManageAssessments] = useState(false);
+  const [renamingName, setRenamingName] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [manageBusy, setManageBusy] = useState(false);
+  const [manageError, setManageError] = useState('');
+  const [manageConflicts, setManageConflicts] = useState<{ studentName: string; subjectName: string }[]>([]);
+  const [deleteAssessmentTarget, setDeleteAssessmentTarget] = useState<{ name: string; count: number } | null>(null);
 
 
 
@@ -208,6 +214,130 @@ export default function ScoreInput() {
 
     const names = Array.from(new Set((data ?? []).map(d => d.assessment))).sort();
     setAssessmentOptions(names);
+  }
+    // ── Manage assessments: rename / delete ─────────────────────────────────
+
+  async function checkRenameCollisions(oldName: string, newName: string) {
+    const studentIds = students.map(s => s.id);
+    const { data } = await supabase
+      .from('scores')
+      .select('student_id, subject_id, assessment')
+      .in('student_id', studentIds)
+      .eq('term', selectedTerm)
+      .eq('year', selectedYear)
+      .in('assessment', [oldName, newName]);
+
+    // Group by student+subject, then check which pairs have BOTH names present —
+    // those are the ones that would collide if we renamed oldName to newName.
+    const seen: Record<string, Set<string>> = {};
+    for (const row of data ?? []) {
+      const key = `${row.student_id}|${row.subject_id}`;
+      if (!seen[key]) seen[key] = new Set();
+      seen[key].add(row.assessment);
+    }
+
+    const conflicts: { studentName: string; subjectName: string }[] = [];
+    for (const key of Object.keys(seen)) {
+      if (seen[key].has(oldName) && seen[key].has(newName)) {
+        const [studentId, subjectId] = key.split('|');
+        conflicts.push({
+          studentName: students.find(s => s.id === studentId)?.name ?? 'Unknown student',
+          subjectName: subjects.find(s => s.id === subjectId)?.name ?? 'Unknown subject',
+        });
+      }
+    }
+    return conflicts;
+  }
+
+  async function handleConfirmRename(oldName: string) {
+    const newName = renameValue.trim();
+    setManageError('');
+    setManageConflicts([]);
+
+    if (!newName) {
+      setManageError('Assessment name cannot be empty.');
+      return;
+    }
+    if (newName === oldName) {
+      setRenamingName(null);
+      return;
+    }
+
+    setManageBusy(true);
+    const conflicts = await checkRenameCollisions(oldName, newName);
+
+    if (conflicts.length > 0) {
+      setManageConflicts(conflicts);
+      setManageError(`Can't rename — these already have a "${newName}" score for the same subject:`);
+      setManageBusy(false);
+      return;
+    }
+
+    const studentIds = students.map(s => s.id);
+    const { error } = await supabase
+      .from('scores')
+      .update({ assessment: newName })
+      .in('student_id', studentIds)
+      .eq('term', selectedTerm)
+      .eq('year', selectedYear)
+      .eq('assessment', oldName);
+
+    setManageBusy(false);
+
+    if (error) {
+      setManageError(error.message);
+      return;
+    }
+
+    setRenamingName(null);
+    await loadAssessmentOptions(studentIds, selectedTerm, selectedYear);
+
+    // If the renamed assessment is the one currently loaded into the score grid, follow the rename
+    if (assessmentName === oldName) {
+      setAssessmentName(newName);
+    }
+  }
+
+  async function openDeleteAssessmentConfirm(name: string) {
+    const studentIds = students.map(s => s.id);
+    const { count } = await supabase
+      .from('scores')
+      .select('id', { count: 'exact', head: true })
+      .in('student_id', studentIds)
+      .eq('term', selectedTerm)
+      .eq('year', selectedYear)
+      .eq('assessment', name);
+
+    setDeleteAssessmentTarget({ name, count: count ?? 0 });
+  }
+
+  async function handleConfirmDeleteAssessment(name: string) {
+    const studentIds = students.map(s => s.id);
+    setManageBusy(true);
+
+    const { error } = await supabase
+      .from('scores')
+      .delete()
+      .in('student_id', studentIds)
+      .eq('term', selectedTerm)
+      .eq('year', selectedYear)
+      .eq('assessment', name);
+
+    setManageBusy(false);
+    setDeleteAssessmentTarget(null);
+
+    if (error) {
+      setManageError(error.message);
+      return;
+    }
+
+    await loadAssessmentOptions(studentIds, selectedTerm, selectedYear);
+
+    // If the deleted assessment is the one currently loaded into the grid, clear it out
+    if (assessmentName === name) {
+      setAssessmentName('');
+      setRows(prev => prev.map(row => ({ ...row, scores: {} })));
+    }
   }
 
 
@@ -470,8 +600,22 @@ export default function ScoreInput() {
             </select>
           </div>
 
-          <div className="flex-1 min-w-48">
-            <label className="block text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wide">Assessment</label>
+                    <div className="flex-1 min-w-48 relative">
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide">Assessment</label>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowManageAssessments(v => !v);
+                  setManageError('');
+                  setManageConflicts([]);
+                  setRenamingName(null);
+                }}
+                className="text-xs font-medium text-blue-700 hover:underline"
+              >
+                Manage
+              </button>
+            </div>
             <input
               list="assessment-options"
               value={assessmentName}
@@ -486,6 +630,86 @@ export default function ScoreInput() {
             <datalist id="assessment-options">
               {assessmentOptions.map(name => <option key={name} value={name} />)}
             </datalist>
+
+            {showManageAssessments && (
+              <div className="absolute z-20 mt-2 w-80 bg-white border border-slate-200 rounded-xl shadow-lg p-3 right-0">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-semibold text-slate-700 uppercase tracking-wide">
+                    Assessments — {selectedTerm} {selectedYear}
+                  </span>
+                  <button onClick={() => setShowManageAssessments(false)} className="text-slate-400 hover:text-slate-600">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {manageError && (
+                  <div className="mb-2 p-2 bg-red-50 border border-red-100 rounded-lg text-xs text-red-700">
+                    <div className="flex items-start gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                      <span>{manageError}</span>
+                    </div>
+                    {manageConflicts.length > 0 && (
+                      <ul className="mt-1.5 ml-5 list-disc space-y-0.5">
+                        {manageConflicts.map((c, i) => (
+                          <li key={i}>{c.studentName} — {c.subjectName}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+
+                <div className="space-y-1 max-h-56 overflow-y-auto">
+                  {assessmentOptions.length === 0 && (
+                    <p className="text-xs text-slate-400 py-2 text-center">No assessments recorded yet for this term/year.</p>
+                  )}
+                  {assessmentOptions.map(name => (
+                    <div key={name} className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-slate-50">
+                      {renamingName === name ? (
+                        <>
+                          <input
+                            autoFocus
+                            value={renameValue}
+                            onChange={e => setRenameValue(e.target.value)}
+                            className="flex-1 border border-slate-200 rounded-lg px-2 py-1 text-xs"
+                          />
+                          <button
+                            disabled={manageBusy}
+                            onClick={() => handleConfirmRename(name)}
+                            className="text-xs font-medium text-green-700 hover:underline disabled:opacity-50"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => { setRenamingName(null); setManageError(''); setManageConflicts([]); }}
+                            className="text-slate-400 hover:text-slate-600"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <span className="flex-1 text-sm text-slate-800 truncate">{name}</span>
+                          <button
+                            onClick={() => { setRenamingName(name); setRenameValue(name); setManageError(''); setManageConflicts([]); }}
+                            className="text-slate-400 hover:text-blue-600"
+                            title="Rename"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => openDeleteAssessmentConfirm(name)}
+                            className="text-slate-400 hover:text-red-600"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
 
@@ -815,6 +1039,35 @@ export default function ScoreInput() {
           </div>
         </div>
       )}
+
+            {deleteAssessmentTarget && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-5">
+            <div className="flex items-center gap-2 text-red-600 mb-2">
+              <AlertTriangle className="w-5 h-5" />
+              <h3 className="font-semibold text-sm">Delete "{deleteAssessmentTarget.name}"?</h3>
+            </div>
+            <p className="text-sm text-slate-600 mb-4">
+              This will permanently delete <strong>{deleteAssessmentTarget.count}</strong> score record{deleteAssessmentTarget.count !== 1 ? 's' : ''} for {selectedTerm} {selectedYear}. This cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setDeleteAssessmentTarget(null)}
+                className="px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={manageBusy}
+                onClick={() => handleConfirmDeleteAssessment(deleteAssessmentTarget.name)}
+                className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+              >
+                {manageBusy ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}                    
       {deleteStudentTarget && (
   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
     <div className="bg-white rounded-2xl shadow-xl p-6 w-[90%] max-w-sm text-center">
