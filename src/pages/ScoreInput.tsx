@@ -58,7 +58,8 @@ export default function ScoreInput() {
   const [manageError, setManageError] = useState('');
   const [manageConflicts, setManageConflicts] = useState<{ studentName: string; subjectName: string }[]>([]);
   const [deleteAssessmentTarget, setDeleteAssessmentTarget] = useState<{ name: string; count: number } | null>(null);
-  
+  const [viewMode, setViewMode] = useState<'grid' | 'focus'>('grid');
+  const [focusIndex, setFocusIndex] = useState(0);
 
 
 
@@ -160,6 +161,7 @@ export default function ScoreInput() {
     const cls = classes.find(c => c.id === selectedClassId) ?? null;
     setSelectedClass(cls);
     loadClassStructure(selectedClassId, cls?.level_id ?? null);
+    setFocusIndex(0);
   }, [selectedClassId, classes, user]);
 
     // ── Load saved scores + assessment names when class/term/year/assessment changes ──
@@ -572,6 +574,40 @@ export default function ScoreInput() {
     for (const key of dirtyKeys) dirtyCellsRef.current.delete(key);
     setAutosaveStatus('idle');
   }
+
+
+    // ── Focus Mode keyboard flow: Enter moves to the next subject for this
+  // student, and once you're on the last subject, Enter jumps to the NEXT
+  // STUDENT'S first subject — so holding down Enter blasts through an entire
+  // class, one field at a time, hands never leaving the keyboard.
+  function handleFocusKeyDown(e: React.KeyboardEvent<HTMLInputElement>, subjectIndex: number) {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+
+    if (subjectIndex < subjects.length - 1) {
+      const nextSub = subjects[subjectIndex + 1];
+      const student = rows[focusIndex];
+      const nextInput = inputRefsRef.current.get(`${student.studentId}|${nextSub.id}`);
+      nextInput?.focus();
+      nextInput?.select();
+    } else if (focusIndex < rows.length - 1) {
+      const nextIndex = focusIndex + 1;
+      setFocusIndex(nextIndex);
+      // The next student's inputs don't exist in the DOM yet — they only get
+      // created once React re-renders with the new focusIndex. setTimeout(...,0)
+      // defers our focus() call until just after that render completes.
+      setTimeout(() => {
+        const nextStudent = rows[nextIndex];
+        const firstSub = subjects[0];
+        const nextInput = inputRefsRef.current.get(`${nextStudent.studentId}|${firstSub.id}`);
+        nextInput?.focus();
+        nextInput?.select();
+      }, 0);
+    }
+  }
+
+
+
 
   // ── Save scores (upsert) ──────────────────────────────────────────────────
   async function handleSave() {
@@ -1024,8 +1060,9 @@ export default function ScoreInput() {
             )}
           </div>
 
-                  {selectedClassId && (
-          <div className="flex items-center gap-1.5 mt-2 text-xs">
+         {selectedClassId && (
+          <div className="flex items-center justify-between mt-2">
+          <div className="flex items-center gap-1.5 text-xs">
             {autosaveStatus === 'saving' && (
               <span className="flex items-center gap-1 text-blue-600">
                 <Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving...
@@ -1039,11 +1076,27 @@ export default function ScoreInput() {
                 <CheckCircle className="w-3.5 h-3.5" /> All changes saved
               </span>
             )}
-            {autosaveStatus === 'error' && (
+                        {autosaveStatus === 'error' && (
               <span className="flex items-center gap-1 text-red-600">
                 <AlertCircle className="w-3.5 h-3.5" /> Autosave failed — will retry automatically
               </span>
             )}
+          </div>
+
+          <div className="flex rounded-lg border border-slate-200 overflow-hidden">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`px-3 py-1.5 text-xs font-semibold transition ${viewMode === 'grid' ? 'bg-blue-700 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+            >
+              Grid
+            </button>
+            <button
+              onClick={() => setViewMode('focus')}
+              className={`px-3 py-1.5 text-xs font-semibold transition ${viewMode === 'focus' ? 'bg-blue-700 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+            >
+              Focus Mode
+            </button>
+          </div>
           </div>
         )}
 
@@ -1190,8 +1243,10 @@ export default function ScoreInput() {
           <p className="font-medium text-slate-600">No students in this class yet</p>
           <p className="text-sm text-slate-400 mt-1">Use "Add Student" above to enrol students.</p>
         </div>
-      ) : (
+      ) : (viewMode === 'grid' ? (
         <div id="score-table" className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+          
+          
           {/* Legend */}
           <div className="flex items-center gap-4 px-5 py-3 border-b border-slate-100 bg-slate-50/60">
             <span className="text-xs text-slate-500 font-medium">Legend:</span>
@@ -1330,7 +1385,105 @@ export default function ScoreInput() {
             </button>
           </div>
         </div>
-      )}
+      ):(<div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 max-w-xl mx-auto">
+          {/* Progress */}
+          <div className="mb-5">
+            <div className="flex items-center justify-between text-xs text-slate-500 mb-1.5">
+              <span>Student {focusIndex + 1} of {rows.length}</span>
+              <span>
+                {rows.filter(r => subjects.every(s => {
+                  const v = parseFloat(r.scores[s.id] ?? '');
+                  return !isNaN(v) && v >= 0 && v <= 100;
+                })).length} of {rows.length} complete
+              </span>
+            </div>
+            <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-blue-600 transition-all"
+                style={{ width: `${((focusIndex + 1) / rows.length) * 100}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Student header */}
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center shrink-0">
+              <span className="font-bold text-blue-700 text-lg">
+                {rows[focusIndex]?.studentName.charAt(0).toUpperCase()}
+              </span>
+            </div>
+            <div>
+              <p className="font-semibold text-slate-900 text-lg">{rows[focusIndex]?.studentName}</p>
+              <p className="text-xs text-slate-400">{selectedTerm} {selectedYear} · {assessmentName}</p>
+            </div>
+          </div>
+
+          {/* Subject inputs */}
+          <div className="space-y-4">
+            {subjects.map((sub, subjectIndex) => {
+              const student = rows[focusIndex];
+              const val = student?.scores[sub.id] ?? '';
+              const num = parseFloat(val);
+              const hasValidScore = val !== '' && !isNaN(num) && num >= 0 && num <= 100;
+              return (
+                <div key={sub.id} className="flex items-center justify-between gap-4">
+                  <label className="text-sm font-medium text-slate-700 flex-1">{sub.name}</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      ref={el => {
+                        if (!student) return;
+                        if (el) inputRefsRef.current.set(`${student.studentId}|${sub.id}`, el);
+                        else inputRefsRef.current.delete(`${student.studentId}|${sub.id}`);
+                      }}
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.5"
+                      value={val}
+                      onChange={e => student && setScore(student.studentId, sub.id, e.target.value)}
+                      onKeyDown={e => handleFocusKeyDown(e, subjectIndex)}
+                      placeholder="—"
+                      className="w-24 text-center text-lg border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    {hasValidScore ? (
+                      <span className={`text-xs font-bold px-2 py-1 rounded-full w-14 text-center ${getSubLevelColor(getCBCSubLevel(num))}`}>
+                        {getCBCSubLevel(num)}
+                      </span>
+                    ) : (
+                      <span className="w-14" />
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Navigation */}
+          <div className="flex items-center justify-between mt-6 pt-4 border-t border-slate-100">
+            <button
+              onClick={() => setFocusIndex(i => Math.max(0, i - 1))}
+              disabled={focusIndex === 0}
+              className="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              ← Previous
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50"
+            >
+              <Save className="w-4 h-4" /> {saving ? 'Saving...' : 'Check Missing'}
+            </button>
+            <button
+              onClick={() => setFocusIndex(i => Math.min(rows.length - 1, i + 1))}
+              disabled={focusIndex === rows.length - 1}
+              className="px-4 py-2 text-sm font-semibold text-white bg-blue-700 rounded-xl hover:bg-blue-800 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Next →
+            </button>
+          </div>
+        </div>
+      ))}
 
       {/* Missing Scores Modal */}
       {showMissingModal && (
