@@ -13,11 +13,14 @@ import {
   X,
   AlertTriangle,
   Trophy,
+  Loader2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import type { Student, Subject, Class } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { getCBCSubLevel, getSubLevelColor } from '../lib/riskEngine';
+import * as XLSX from 'xlsx';
 
 const TERMS = ['Term 1', 'Term 2', 'Term 3'];
 const CURRENT_YEAR = new Date().getFullYear().toString();
@@ -55,6 +58,7 @@ export default function ScoreInput() {
   const [manageError, setManageError] = useState('');
   const [manageConflicts, setManageConflicts] = useState<{ studentName: string; subjectName: string }[]>([]);
   const [deleteAssessmentTarget, setDeleteAssessmentTarget] = useState<{ name: string; count: number } | null>(null);
+  
 
 
 
@@ -93,6 +97,35 @@ export default function ScoreInput() {
     id: string;
     name: string;
   } | null>(null);
+
+    const [autosaveStatus, setAutosaveStatus] = useState<'idle' | 'pending' | 'saving' | 'error'>('idle');
+
+  // Refs mirror the latest state so a setTimeout callback scheduled a moment ago
+  // can still read fresh data when it actually fires — plain closures would see
+  // whatever `rows`/`selectedTerm`/etc. looked like at the exact instant the
+  // timer was scheduled, which is "stale" the moment another keystroke happens.
+  const rowsRef = useRef<ScoreRow[]>(rows);
+  const contextRef = useRef({ term: selectedTerm, year: selectedYear, assessment: assessmentName });
+  const dirtyCellsRef = useRef<Set<string>>(new Set());
+  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inputRefsRef = useRef<Map<string, HTMLInputElement>>(new Map());
+  
+  type PreviewCell = { studentId: string; studentName: string; subjectId: string; subjectName: string; value: string };
+  const [preview, setPreview] = useState<{ cells: PreviewCell[]; warnings: string[]; source: 'paste' | 'import' } | null>(null);
+  const [importBusy, setImportBusy] = useState(false);
+
+  useEffect(() => {
+    contextRef.current = { term: selectedTerm, year: selectedYear, assessment: assessmentName };
+  }, [selectedTerm, selectedYear, assessmentName]);
+
+    useEffect(() => {
+    return () => {
+      if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+      if (dirtyCellsRef.current.size > 0) {
+        flushAutosave();
+      }
+    };
+  }, [selectedClassId, selectedTerm, selectedYear, assessmentName]);
 
   // ── Load classes: teachers see only their assigned class; admins see all ─
   useEffect(() => {
@@ -343,12 +376,201 @@ export default function ScoreInput() {
 
 
   // ── Score input handler ───────────────────────────────────────────────────
-  function setScore(studentId: string, subjectId: string, value: string) {
-    setRows(prev =>
-      prev.map(r =>
+    function setScore(studentId: string, subjectId: string, value: string) {
+    setRows(prev => {
+      // Updating rowsRef HERE — synchronously, inside the setState updater —
+      // is what avoids the stale-closure trap. React itself won't re-render
+      // (and hand us a fresh `rows` variable) until after this function returns,
+      // but rowsRef.current is a plain mutable object, so it's updated instantly.
+      const next = prev.map(r =>
         r.studentId === studentId ? { ...r, scores: { ...r.scores, [subjectId]: value } } : r
-      )
-    );
+      );
+      rowsRef.current = next;
+      return next;
+    });
+
+    dirtyCellsRef.current.add(`${studentId}|${subjectId}`);
+    setAutosaveStatus('pending');
+
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    autosaveTimerRef.current = setTimeout(() => {
+      flushAutosave();
+    }, 1200);
+  }
+
+
+    // ── Grid keyboard navigation ─────────────────────────────────────────────
+  // Deliberate choice: we only intercept Enter/ArrowDown/ArrowUp for vertical
+  // movement (matching the natural "fill one subject down the whole class"
+  // workflow). Left/Right are left to Tab's native browser behavior, so a
+  // number input's own text-cursor editing never gets fought over.
+  // One real trade-off: type="number" inputs normally use ArrowUp/ArrowDown to
+  // nudge the value by `step` — we're intentionally overriding that, since
+  // jumping between students is far more useful here than a spinner.
+  function handleCellKeyDown(e: React.KeyboardEvent<HTMLInputElement>, rowIndex: number, colIndex: number) {
+    let targetRowIndex = rowIndex;
+
+    if (e.key === 'Enter' || e.key === 'ArrowDown') {
+      targetRowIndex = rowIndex + 1;
+    } else if (e.key === 'ArrowUp') {
+      targetRowIndex = rowIndex - 1;
+    } else {
+      return; // not a key we handle — let the browser do its normal thing
+    }
+
+    e.preventDefault();
+    const targetRow = rows[targetRowIndex];
+    const targetSub = subjects[colIndex];
+    if (!targetRow || !targetSub) return;
+
+    const nextInput = inputRefsRef.current.get(`${targetRow.studentId}|${targetSub.id}`);
+    nextInput?.focus();
+    nextInput?.select(); // select existing text so typing immediately overwrites it, spreadsheet-style
+  }
+
+    // ── Paste-from-spreadsheet, routed through the shared preview/confirm panel ──
+  function handleCellPaste(e: React.ClipboardEvent<HTMLInputElement>, rowIndex: number, colIndex: number) {
+    const text = e.clipboardData.getData('text');
+    if (!text.includes('\n') && !text.includes('\t')) return; // single value — let the browser paste it normally
+
+    e.preventDefault();
+
+    const grid = text
+      .replace(/\r/g, '')
+      .split('\n')
+      .filter(line => line.length > 0)
+      .map(line => line.split('\t'));
+
+    // If every first-column value is non-numeric text, treat this as a
+    // "Name, Score, Score..." paste and match by NAME instead of position —
+    // this is what protects you when the source spreadsheet's row order
+    // doesn't match your roster's order.
+    const looksLikeNameColumn = grid.every(line => {
+      const first = line[0]?.trim() ?? '';
+      return first !== '' && isNaN(parseFloat(first));
+    });
+
+    const cells: PreviewCell[] = [];
+    const warnings: string[] = [];
+
+    if (looksLikeNameColumn) {
+      grid.forEach(line => {
+        const name = line[0].trim();
+        const student = findStudentByName(name);
+        if (!student) {
+          warnings.push(`No matching student found for "${name}" — that row was skipped.`);
+          return;
+        }
+        for (let i = 1; i < line.length; i++) {
+          const sub = subjects[colIndex + (i - 1)];
+          const val = line[i]?.trim();
+          if (!sub || !val) continue;
+          cells.push({ studentId: student.studentId, studentName: student.studentName, subjectId: sub.id, subjectName: sub.name, value: val });
+        }
+      });
+    } else {
+      grid.forEach((line, rOffset) => {
+        line.forEach((rawVal, cOffset) => {
+          const targetRow = rows[rowIndex + rOffset];
+          const targetSub = subjects[colIndex + cOffset];
+          const cleaned = rawVal.trim();
+          if (!targetRow || !targetSub || cleaned === '') return;
+          cells.push({ studentId: targetRow.studentId, studentName: targetRow.studentName, subjectId: targetSub.id, subjectName: targetSub.name, value: cleaned });
+        });
+      });
+      if (grid.length > rows.length - rowIndex) {
+        warnings.push(`You pasted ${grid.length} rows, but only ${rows.length - rowIndex} students remain below this point — the extra rows were ignored. Double-check the values below match who you expect before applying.`);
+      } else {
+        warnings.push(`This paste is being matched by POSITION (row order), not by name — carefully check every name below matches the value next to it before applying.`);
+      }
+    }
+
+    setPreview({ cells, warnings, source: 'paste' });
+  }
+
+    function findStudentByName(name: string) {
+    const normalized = name.trim().toLowerCase();
+    return rows.find(r => r.studentName.trim().toLowerCase() === normalized) ?? null;
+  }
+
+    // ── Export current grid to .xlsx or .csv ─────────────────────────────────
+  function handleExport(format: 'xlsx' | 'csv') {
+    const headerRow = ['Student Name', ...subjects.map(s => s.name)];
+    const dataRows = rows.map(row => [
+      row.studentName,
+      ...subjects.map(sub => row.scores[sub.id] ?? ''),
+    ]);
+
+    const worksheet = XLSX.utils.aoa_to_sheet([headerRow, ...dataRows]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Scores');
+
+    const filename = `Scores_${selectedClass?.name ?? 'Class'}_${selectedTerm}_${selectedYear}_${assessmentName}`
+      .replace(/\s+/g, '-');
+
+    XLSX.writeFile(workbook, `${filename}.${format}`, { bookType: format });
+  }
+
+
+    async function flushAutosave() {
+    const dirtyKeys = Array.from(dirtyCellsRef.current);
+    if (dirtyKeys.length === 0) return;
+
+    const { term, year, assessment } = contextRef.current;
+    const currentRows = rowsRef.current;
+
+    const toUpsert: {
+      student_id: string;
+      subject_id: string;
+      score: number;
+      term: string;
+      year: string;
+      assessment: string;
+      teacher_id: string;
+      school_id: string | null;
+    }[] = [];
+
+    for (const key of dirtyKeys) {
+      const [studentId, subjectId] = key.split('|');
+      const row = currentRows.find(r => r.studentId === studentId);
+      const val = row?.scores[subjectId] ?? '';
+      const num = parseFloat(val);
+      if (val !== '' && !isNaN(num) && num >= 0 && num <= 100) {
+        toUpsert.push({
+          student_id: studentId,
+          subject_id: subjectId,
+          score: num,
+          term,
+          year,
+          assessment,
+          teacher_id: user!.id,
+          school_id: schoolId,
+        });
+      }
+    }
+
+    if (toUpsert.length === 0) {
+      dirtyCellsRef.current.clear();
+      setAutosaveStatus('idle');
+      return;
+    }
+
+    setAutosaveStatus('saving');
+
+    const { error } = await supabase
+      .from('scores')
+      .upsert(toUpsert, { onConflict: 'student_id,subject_id,term,year,assessment' });
+
+    if (error) {
+      console.error('Autosave failed:', error.message);
+      setAutosaveStatus('error');
+      // Deliberately NOT clearing dirtyCellsRef here — leaving these cells marked
+      // dirty means the next successful flush will retry them automatically.
+      return;
+    }
+
+    for (const key of dirtyKeys) dirtyCellsRef.current.delete(key);
+    setAutosaveStatus('idle');
   }
 
   // ── Save scores (upsert) ──────────────────────────────────────────────────
@@ -432,6 +654,62 @@ export default function ScoreInput() {
     }
 
     setSaving(false);
+  }
+
+
+
+    // ── Import from .xlsx or .csv, routed through the same preview/confirm panel ──
+  async function handleImportFile(file: File) {
+    setImportBusy(true);
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: 'array' });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const grid = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1, raw: false });
+
+      if (grid.length < 2) {
+        setPreview({ cells: [], warnings: ['That file has no data rows to import.'], source: 'import' });
+        return;
+      }
+
+      const headerRow = grid[0].map(h => (h ?? '').toString().trim());
+      const nameColIndex = headerRow.findIndex(h => h.toLowerCase() === 'student name');
+      if (nameColIndex === -1) {
+        setPreview({ cells: [], warnings: ['No "Student Name" column found in the header row — check the file matches the exported format.'], source: 'import' });
+        return;
+      }
+
+      // Match each remaining header to a real subject by exact (case-insensitive) name
+      const subjectColumns = headerRow
+        .map((header, colIdx) => ({ colIdx, subject: subjects.find(s => s.name.toLowerCase() === header.toLowerCase()) }))
+        .filter(c => c.subject);
+
+      const unmatchedHeaders = headerRow.filter((h, i) => i !== nameColIndex && h !== '' && !subjects.some(s => s.name.toLowerCase() === h.toLowerCase()));
+
+      const cells: PreviewCell[] = [];
+      const warnings: string[] = [...unmatchedHeaders.map(h => `Column "${h}" doesn't match any subject in this class — it was ignored.`)];
+
+      for (const line of grid.slice(1)) {
+        const name = (line[nameColIndex] ?? '').toString().trim();
+        if (!name) continue;
+        const student = findStudentByName(name);
+        if (!student) {
+          warnings.push(`No matching student found for "${name}" — that row was skipped.`);
+          continue;
+        }
+        for (const { colIdx, subject } of subjectColumns) {
+          const val = (line[colIdx] ?? '').toString().trim();
+          if (!subject || val === '') continue;
+          cells.push({ studentId: student.studentId, studentName: student.studentName, subjectId: subject.id, subjectName: subject.name, value: val });
+        }
+      }
+
+      setPreview({ cells, warnings, source: 'import' });
+    } catch (err) {
+      setPreview({ cells: [], warnings: [`Couldn't read that file: ${err instanceof Error ? err.message : 'unknown error'}`], source: 'import' });
+    } finally {
+      setImportBusy(false);
+    }
   }
 
   // ── Add student ───────────────────────────────────────────────────────────
@@ -599,6 +877,40 @@ export default function ScoreInput() {
               })}
             </select>
           </div>
+          
+                    <div className="flex items-end gap-2">
+            <button
+              type="button"
+              onClick={() => handleExport('xlsx')}
+              className="px-3 py-2.5 text-xs font-medium text-slate-700 border border-slate-200 rounded-xl hover:bg-slate-50"
+            >
+              Export .xlsx
+            </button>
+            <button
+              type="button"
+              onClick={() => handleExport('csv')}
+              className="px-3 py-2.5 text-xs font-medium text-slate-700 border border-slate-200 rounded-xl hover:bg-slate-50"
+            >
+              Export .csv
+            </button>
+            <label className="px-3 py-2.5 text-xs font-medium text-blue-700 border border-blue-200 rounded-xl hover:bg-blue-50 cursor-pointer">
+              {importBusy ? 'Reading...' : 'Import File'}
+              <input
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                className="hidden"
+                onChange={e => {
+                  const file = e.target.files?.[0];
+                  if (file) handleImportFile(file);
+                  e.target.value = ''; // allow re-selecting the same file next time
+                }}
+              />
+            </label>
+          </div>
+
+
+
+
 
                     <div className="flex-1 min-w-48 relative">
             <div className="flex items-center justify-between mb-1.5">
@@ -711,6 +1023,30 @@ export default function ScoreInput() {
               </div>
             )}
           </div>
+
+                  {selectedClassId && (
+          <div className="flex items-center gap-1.5 mt-2 text-xs">
+            {autosaveStatus === 'saving' && (
+              <span className="flex items-center gap-1 text-blue-600">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving...
+              </span>
+            )}
+            {autosaveStatus === 'pending' && (
+              <span className="text-slate-400">Unsaved changes...</span>
+            )}
+            {autosaveStatus === 'idle' && (
+              <span className="flex items-center gap-1 text-green-600">
+                <CheckCircle className="w-3.5 h-3.5" /> All changes saved
+              </span>
+            )}
+            {autosaveStatus === 'error' && (
+              <span className="flex items-center gap-1 text-red-600">
+                <AlertCircle className="w-3.5 h-3.5" /> Autosave failed — will retry automatically
+              </span>
+            )}
+          </div>
+        )}
+
 
 
 
@@ -883,7 +1219,7 @@ export default function ScoreInput() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {rows.map(row => (
+                {rows.map((row, rowIndex) => (
                   <tr key={row.studentId} className="hover:bg-slate-50/40 transition-colors group">
                     {/* Student name cell */}
                     <td className="px-5 py-3">
@@ -922,18 +1258,27 @@ export default function ScoreInput() {
                     </td>
 
                     {/* Score cells */}
-                    {subjects.map(sub => {
+                                        {subjects.map((sub, colIndex) => {
                       const missing = isMissingCell(row.studentId, sub.id);
                       const saved = isSavedCell(row.studentId, sub.id);
+                      const currentVal = row.scores[sub.id] ?? '';
+                      const currentNum = parseFloat(currentVal);
+                      const hasValidScore = currentVal !== '' && !isNaN(currentNum) && currentNum >= 0 && currentNum <= 100;
                       return (
-                        <td key={sub.id} className="px-3 py-3 text-center">
+                                                <td key={sub.id} className="px-3 py-3 text-center">
                           <input
+                            ref={el => {
+                              if (el) inputRefsRef.current.set(`${row.studentId}|${sub.id}`, el);
+                              else inputRefsRef.current.delete(`${row.studentId}|${sub.id}`);
+                            }}
                             type="number"
                             min="0"
                             max="100"
                             step="0.5"
                             value={row.scores[sub.id] ?? ''}
                             onChange={e => setScore(row.studentId, sub.id, e.target.value)}
+                            onKeyDown={e => handleCellKeyDown(e, rowIndex, colIndex)}
+                            onPaste={e => handleCellPaste(e, rowIndex, colIndex)}
                             placeholder="—"
                             className={`w-20 text-center border rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:border-transparent transition-colors ${
                               missing
@@ -943,6 +1288,11 @@ export default function ScoreInput() {
                                 : 'border-slate-200 bg-white focus:ring-blue-500'
                             }`}
                           />
+                          {hasValidScore && (
+                            <div className={`mt-1 inline-block text-[10px] font-bold px-1.5 py-0.5 rounded-full ${getSubLevelColor(getCBCSubLevel(currentNum))}`}>
+                              {getCBCSubLevel(currentNum)}
+                            </div>
+                          )}
                         </td>
                       );
                     })}
@@ -1034,6 +1384,74 @@ export default function ScoreInput() {
                 className="flex-1 border border-slate-200 hover:bg-slate-100 text-slate-700 text-sm font-medium px-4 py-2.5 rounded-xl transition"
               >
                 Ignore (Student Absent)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
+            {preview && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[80vh] flex flex-col">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="font-semibold text-sm text-slate-900">
+                {preview.source === 'paste' ? 'Confirm Pasted Values' : 'Confirm Import'}
+              </h3>
+              <button onClick={() => setPreview(null)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="px-5 py-3 overflow-y-auto flex-1">
+              {preview.warnings.length > 0 && (
+                <div className="mb-3 p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 space-y-1">
+                  {preview.warnings.map((w, i) => (
+                    <div key={i} className="flex items-start gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                      <span>{w}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {preview.cells.length === 0 ? (
+                <p className="text-sm text-slate-400 text-center py-6">Nothing to apply.</p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs text-slate-400 uppercase tracking-wide">
+                      <th className="py-1.5">Student</th>
+                      <th className="py-1.5">Subject</th>
+                      <th className="py-1.5 text-right">Value</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {preview.cells.map((c, i) => (
+                      <tr key={i}>
+                        <td className="py-1.5 text-slate-900">{c.studentName}</td>
+                        <td className="py-1.5 text-slate-500">{c.subjectName}</td>
+                        <td className="py-1.5 text-right font-semibold text-slate-900">{c.value}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            <div className="px-5 py-3 border-t border-slate-100 flex justify-end gap-2">
+              <button onClick={() => setPreview(null)} className="px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">
+                Cancel
+              </button>
+              <button
+                disabled={preview.cells.length === 0}
+                onClick={() => {
+                  preview.cells.forEach(c => setScore(c.studentId, c.subjectId, c.value));
+                  setPreview(null);
+                }}
+                className="px-3 py-1.5 text-sm font-semibold text-white bg-blue-700 rounded-lg hover:bg-blue-800 disabled:opacity-40"
+              >
+                Apply {preview.cells.length} Value{preview.cells.length !== 1 ? 's' : ''}
               </button>
             </div>
           </div>
