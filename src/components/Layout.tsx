@@ -17,6 +17,7 @@ import {
   Building2,
   TrendingUp,
   Trophy,
+  Settings
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -190,6 +191,18 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
             )}
           </div>
         </div>
+
+
+        <button
+          onClick={() => { navigate('/settings'); onClose?.(); }}
+          className="flex items-center gap-2 w-full px-3 py-2 rounded-xl text-sm text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-all"
+        >
+          <Settings className="w-4 h-4" />
+          Settings
+        </button>
+
+
+
         <button
           onClick={handleSignOut}
           className="flex items-center gap-2 w-full px-3 py-2 rounded-xl text-sm text-slate-500 hover:text-red-600 hover:bg-red-50 transition-all"

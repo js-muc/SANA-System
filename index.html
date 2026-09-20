@@ -8,6 +8,16 @@
     <meta property="og:image" content="https://bolt.new/static/og_default.png" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="https://bolt.new/static/og_default.png" />
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem('sana-theme');
+          if (saved && saved !== 'default') {
+            document.documentElement.setAttribute('data-theme', saved);
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

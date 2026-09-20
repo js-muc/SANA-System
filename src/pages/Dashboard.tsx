@@ -12,6 +12,7 @@ import {
   Activity,
   GraduationCap,
   UserCog,
+  Settings as SettingsIcon
 } from 'lucide-react';
 import {
   AreaChart,
@@ -58,6 +59,7 @@ export default function Dashboard() {
       const scoresQ = supabase.from('scores').select('*, subject:subjects(*)');
 
       if (isAdmin) {
+        
         studentsQ.eq('school_id', schoolId!);
         scoresQ.eq('school_id', schoolId!);
       } else {
@@ -65,7 +67,7 @@ export default function Dashboard() {
         scoresQ.eq('teacher_id', user!.id);
       }
 
-      const ops: Promise<any>[] = [studentsQ, scoresQ];
+      const ops: PromiseLike<any>[] = [studentsQ, scoresQ];
       if (isAdmin) {
         ops.push(
           supabase.from('profiles').select('*').eq('role', 'teacher').eq('school_id', schoolId!),
@@ -195,32 +197,41 @@ export default function Dashboard() {
               : 'All students are within acceptable performance ranges.'}
           </p>
         </div>
-        {!isAdmin && (
+        <div className="hidden sm:flex items-center gap-2">
+          {!isAdmin && (
+            <button
+              onClick={() => navigate('/scores')}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition-all shadow-sm"
+            >
+              <Plus className="w-4 h-4" />
+              Enter Scores
+            </button>
+          )}
+          {isAdmin && (
+            <>
+              <button
+                onClick={() => navigate('/admin/results')}
+                className="flex items-center gap-2 border border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-700 text-sm font-medium px-4 py-2.5 rounded-xl transition"
+              >
+                View Results
+              </button>
+              <button
+                onClick={() => navigate('/admin/teachers')}
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition shadow-sm"
+              >
+                <UserCog className="w-4 h-4" />
+                Teachers
+              </button>
+            </>
+          )}
           <button
-            onClick={() => navigate('/scores')}
-            className="hidden sm:flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition-all shadow-sm"
+            onClick={() => {navigate('/settings')}}
+            title="Settings"
+            className="flex items-center justify-center w-10 h-10 border border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-500 hover:text-blue-700 rounded-xl transition"
           >
-            <Plus className="w-4 h-4" />
-            Enter Scores
+            <SettingsIcon className="w-4 h-4" />
           </button>
-        )}
-        {isAdmin && (
-          <div className="hidden sm:flex gap-2">
-            <button
-              onClick={() => navigate('/admin/results')}
-              className="flex items-center gap-2 border border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-700 text-sm font-medium px-4 py-2.5 rounded-xl transition"
-            >
-              View Results
-            </button>
-            <button
-              onClick={() => navigate('/admin/teachers')}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition shadow-sm"
-            >
-              <UserCog className="w-4 h-4" />
-              Teachers
-            </button>
-          </div>
-        )}
+        </div>
       </div>
 
       {/* Stats */}
@@ -291,8 +302,9 @@ export default function Dashboard() {
                     {displayName}
                   </p>
                   <p className="text-xl font-bold text-slate-900">{levelClasses.length}</p>
+                                    <p className="text-xl font-bold text-slate-900">{levelClasses.length}</p>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    {levelClasses.length === 1 ? 'class' : 'classes'}
+                    {levelClasses.length === 1 ? 'class' : 'classes'} · {levelStudents.length} students
                   </p>
                   <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between">
                     <span className="text-[10px] text-slate-400">
@@ -331,7 +343,7 @@ export default function Dashboard() {
                   <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} />
                   <Tooltip
                     contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 12 }}
-                    formatter={(v: number) => [`${v}%`, 'Average']}
+                                        formatter={(v) => [`${Number(v)}%`, 'Average']}
                   />
                   <Area type="monotone" dataKey="average" stroke="#3b82f6" strokeWidth={2} fill="url(#colorAvg)" />
                 </AreaChart>
@@ -354,7 +366,7 @@ export default function Dashboard() {
                   <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} />
                   <Tooltip
                     contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 12 }}
-                    formatter={(v: number) => [`${v}%`, 'Average']}
+                                        formatter={(v) => [`${Number(v)}%`, 'Average']}
                   />
                   <Bar dataKey="average" fill="#3b82f6" radius={[6, 6, 0, 0]} />
                 </BarChart>

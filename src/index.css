@@ -1,3 +1,99 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+  Theme tokens — each theme is a set of CSS variables holding RGB triples
+  (no commas, no "rgb()" wrapper) so Tailwind can combine them with an
+  alpha value: rgb(var(--color-primary) / <alpha-value>). This is the same
+  pattern used by shadcn/ui and most modern Tailwind theming setups.
+
+  :root holds the DEFAULT theme (today's existing look — nothing changes
+  for anyone until they actively pick a different one). Every other theme
+  overrides the same variable names under [data-theme="..."].
+*/
+
+:root {
+  --color-background: 248 250 252;
+  --color-surface: 255 255 255;
+  --color-foreground: 15 23 42;
+  --color-muted: 100 116 139;
+  --color-border: 226 232 240;
+  --color-primary: 29 78 216;
+  --color-primary-foreground: 255 255 255;
+}
+
+[data-theme="evergreen"] {
+  --color-background: 15 23 18;
+  --color-surface: 24 35 26;
+  --color-foreground: 220 230 210;
+  --color-muted: 140 160 130;
+  --color-border: 45 60 42;
+  --color-primary: 74 222 128;
+  --color-primary-foreground: 10 20 10;
+}
+
+[data-theme="nord"] {
+  --color-background: 46 52 64;
+  --color-surface: 59 66 82;
+  --color-foreground: 236 239 244;
+  --color-muted: 129 161 193;
+  --color-border: 76 86 106;
+  --color-primary: 136 192 208;
+  --color-primary-foreground: 46 52 64;
+}
+
+[data-theme="solarized-light"] {
+  --color-background: 253 246 227;
+  --color-surface: 255 255 255;
+  --color-foreground: 101 123 131;
+  --color-muted: 147 161 161;
+  --color-border: 227 220 199;
+  --color-primary: 38 139 210;
+  --color-primary-foreground: 255 255 255;
+}
+
+[data-theme="solarized-dark"] {
+  --color-background: 0 43 54;
+  --color-surface: 7 54 66;
+  --color-foreground: 131 148 150;
+  --color-muted: 88 110 117;
+  --color-border: 30 74 88;
+  --color-primary: 38 139 210;
+  --color-primary-foreground: 255 255 255;
+}
+
+[data-theme="sepia"] {
+  --color-background: 240 224 197;
+  --color-surface: 250 240 220;
+  --color-foreground: 91 67 43;
+  --color-muted: 140 110 80;
+  --color-border: 214 192 154;
+  --color-primary: 156 102 31;
+  --color-primary-foreground: 255 250 240;
+}
+
+[data-theme="cyberpunk"] {
+  --color-background: 10 10 20;
+  --color-surface: 20 18 35;
+  --color-foreground: 240 240 255;
+  --color-muted: 150 140 200;
+  --color-border: 60 40 90;
+  --color-primary: 255 0 170;
+  --color-primary-foreground: 10 10 20;
+}
+
+[data-theme="matrix"] {
+  --color-background: 0 0 0;
+  --color-surface: 10 15 10;
+  --color-foreground: 0 255 65;
+  --color-muted: 0 140 40;
+  --color-border: 0 60 20;
+  --color-primary: 0 255 65;
+  --color-primary-foreground: 0 0 0;
+}
+
+body {
+  background-color: rgb(var(--color-background));
+  color: rgb(var(--color-foreground));
+}

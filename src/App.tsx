@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import PendingApproval from './pages/PendingApproval';
@@ -8,6 +9,7 @@ import ScoreInput from './pages/ScoreInput';
 import StudentsList from './pages/StudentsList';
 import StudentProfile from './pages/StudentProfile';
 import Reports from './pages/Reports';
+import Settings from './pages/Settings';
 import MeritList from './pages/MeritList';
 import StudentProgress from './pages/StudentProgress';
 import AdminSubjects from './pages/admin/AdminSubjects';
@@ -96,7 +98,7 @@ function ProtectedRoutes() {
         <Route path="/reports" element={<Reports />} />
         <Route path="/progress" element={<StudentProgress />} />
         <Route path="/merit-list" element={<MeritList />} />
-
+        <Route path="/settings" element={<Settings />} />      
         <Route path="/admin/results" element={<AdminRoute><AdminResults /></AdminRoute>} />
         <Route path="/admin/teachers" element={<AdminRoute><AdminTeachers /></AdminRoute>} />
         <Route path="/admin/subjects" element={<AdminRoute><AdminSubjects /></AdminRoute>} />
@@ -120,19 +122,21 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <Routes>
-          <Route
-            path="/login"
-            element={
-              <PublicRoute>
-                <Login />
-              </PublicRoute>
-            }
-          />
-          <Route path="/*" element={<ProtectedRoutes />} />
-        </Routes>
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <Routes>
+            <Route
+              path="/login"
+              element={
+                <PublicRoute>
+                  <Login />
+                </PublicRoute>
+              }
+            />
+            <Route path="/*" element={<ProtectedRoutes />} />
+          </Routes>
+        </AuthProvider>
+      </ThemeProvider>
     </BrowserRouter>
   );
 }
