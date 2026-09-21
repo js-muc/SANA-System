@@ -58,6 +58,12 @@ export type LevelSubject = {
 };
 
 export type Student = {
+  parent_name: string;
+  parent_whatsapp: string;
+  religion: string;
+  year_of_birth: any;
+  admission_number: string;
+  assessment_number: string;
   id: string;
   name: string;
   class_id: string | null;

@@ -47,7 +47,7 @@ export default function StudentsList() {
         scoresQ.eq('teacher_id', user!.id);
       }
 
-      const ops: Promise<any>[] = [studentsQ, scoresQ];
+      const ops: PromiseLike<any>[] = [studentsQ, scoresQ];
       if (isAdmin) {
         ops.push(
           supabase.from('profiles').select('*').eq('role', 'teacher').eq('school_id', schoolId!).order('name'),

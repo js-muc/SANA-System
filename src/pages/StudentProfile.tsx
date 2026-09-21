@@ -50,9 +50,74 @@ export default function StudentProfile() {
   const [loading, setLoading] = useState(true);
   const [historyTerm, setHistoryTerm] = useState('Term 1');
   const [historyYear, setHistoryYear] = useState(CURRENT_YEAR);
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    parent_name: '', parent_email: '', parent_whatsapp: '', religion: '',
+    year_of_birth: '', admission_number: '', assessment_number: '',
+  });
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileError, setProfileError] = useState('');
+  
+  useEffect(() => {
+    if (!student) return;
+    setProfileForm({
+      parent_name: student.parent_name ?? '',
+      parent_email: student.parent_email ?? '',
+      parent_whatsapp: student.parent_whatsapp ?? '',
+      religion: student.religion ?? '',
+      year_of_birth: student.year_of_birth?.toString() ?? '',
+      admission_number: student.admission_number ?? '',
+      assessment_number: student.assessment_number ?? '',
+    });
+  }, [student]);
+
+
+  async function handleSaveProfile() {
+    if (!student) return;
+    setProfileError('');
+
+    let yearNum: number | null = null;
+    if (profileForm.year_of_birth.trim() !== '') {
+      yearNum = parseInt(profileForm.year_of_birth, 10);
+      if (isNaN(yearNum) || yearNum < 1990 || yearNum > new Date().getFullYear()) {
+        setProfileError('Year of birth looks invalid.');
+        return;
+      }
+    }
+
+    setSavingProfile(true);
+
+    const updates = {
+      parent_name: profileForm.parent_name.trim() || null,
+      parent_email: profileForm.parent_email.trim(),
+      parent_whatsapp: profileForm.parent_whatsapp.trim() || null,
+      religion: profileForm.religion.trim() || null,
+      year_of_birth: yearNum,
+      admission_number: profileForm.admission_number.trim() || null,
+      assessment_number: profileForm.assessment_number.trim() || null,
+    };
+
+    const { error } = await supabase.from('students').update(updates).eq('id', student.id);
+    setSavingProfile(false);
+
+    if (error) {
+      setProfileError(error.message);
+      return;
+    }
+
+    setStudent({ ...student, ...updates } as Student);
+    setEditingProfile(false);
+  }
+
+  
+
+
 
   useEffect(() => {
     if (!user || !id) return;
+
+
+
     async function load() {
       const studentQ = supabase.from('students').select('*, class:classes(*)').eq('id', id!);
       const scoresQ = supabase.from('scores').select('*, subject:subjects(*)').eq('student_id', id!).order('created_at');
@@ -67,6 +132,8 @@ export default function StudentProfile() {
     }
     load();
   }, [user, id]);
+
+  
 
   const risk = useMemo(() => id ? analyzeStudent(id, scores) : null, [id, scores]);
 
@@ -180,6 +247,76 @@ export default function StudentProfile() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Learner Profile */}
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 mb-5">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold text-sm text-slate-900">Learner Profile</h3>
+          {!editingProfile ? (
+            <button onClick={() => setEditingProfile(true)} className="text-xs font-medium text-blue-700 hover:underline">
+              Edit
+            </button>
+          ) : (
+            <div className="flex items-center gap-3">
+              <button onClick={() => { setEditingProfile(false); setProfileError(''); }} className="text-xs font-medium text-slate-500 hover:underline">
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveProfile}
+                disabled={savingProfile}
+                className="text-xs font-semibold text-white bg-blue-700 hover:bg-blue-800 px-3 py-1.5 rounded-lg disabled:opacity-50"
+              >
+                {savingProfile ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {profileError && <p className="text-xs text-red-600 mb-3">{profileError}</p>}
+
+        {!editingProfile ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
+            <div><p className="text-xs text-slate-400 mb-0.5">Parent/Guardian Name</p><p className="text-slate-900">{student.parent_name || '—'}</p></div>
+            <div><p className="text-xs text-slate-400 mb-0.5">Parent Email</p><p className="text-slate-900">{student.parent_email || '—'}</p></div>
+            <div><p className="text-xs text-slate-400 mb-0.5">Parent WhatsApp</p><p className="text-slate-900">{student.parent_whatsapp || '—'}</p></div>
+            <div><p className="text-xs text-slate-400 mb-0.5">Religion</p><p className="text-slate-900">{student.religion || '—'}</p></div>
+            <div><p className="text-xs text-slate-400 mb-0.5">Year of Birth</p><p className="text-slate-900">{student.year_of_birth ?? '—'}</p></div>
+            <div><p className="text-xs text-slate-400 mb-0.5">Admission No.</p><p className="text-slate-900">{student.admission_number || '—'}</p></div>
+            <div><p className="text-xs text-slate-400 mb-0.5">Assessment No.</p><p className="text-slate-900">{student.assessment_number || '—'}</p></div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">Parent/Guardian Name</label>
+              <input value={profileForm.parent_name} onChange={e => setProfileForm(f => ({ ...f, parent_name: e.target.value }))} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">Parent Email</label>
+              <input type="email" value={profileForm.parent_email} onChange={e => setProfileForm(f => ({ ...f, parent_email: e.target.value }))} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">Parent WhatsApp Number</label>
+              <input value={profileForm.parent_whatsapp} onChange={e => setProfileForm(f => ({ ...f, parent_whatsapp: e.target.value }))} placeholder="+254 7XX XXX XXX" className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">Religion</label>
+              <input value={profileForm.religion} onChange={e => setProfileForm(f => ({ ...f, religion: e.target.value }))} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">Year of Birth</label>
+              <input value={profileForm.year_of_birth} onChange={e => setProfileForm(f => ({ ...f, year_of_birth: e.target.value }))} placeholder="e.g. 2015" className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">Admission Number</label>
+              <input value={profileForm.admission_number} onChange={e => setProfileForm(f => ({ ...f, admission_number: e.target.value }))} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">Assessment Number</label>
+              <input value={profileForm.assessment_number} onChange={e => setProfileForm(f => ({ ...f, assessment_number: e.target.value }))} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* AI Insights */}
